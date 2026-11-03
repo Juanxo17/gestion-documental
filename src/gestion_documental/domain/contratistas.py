@@ -8,7 +8,7 @@ from gestion_documental.domain.errores import ErrorDominio
 from gestion_documental.domain.mixins import AuditableMixin
 
 PATRON_CEDULA = re.compile(r"[1-9]\d{5,9}")
-PATRON_NIT = re.compile(r"(\d{9})-(\d)")
+PATRON_NIT = re.compile(r"(\d{9})(?:-(\d))?")
 PESOS_NIT = (3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71)
 
 
@@ -56,7 +56,7 @@ class PersonaJuridica(Contratista):
     def validar_identificacion(self) -> None:
         coincidencia = PATRON_NIT.fullmatch(self.nit_cedula)
         if coincidencia is None:
-            raise ErrorDominio("El NIT debe tener el formato NNNNNNNNN-D")
+            raise ErrorDominio("El NIT debe tener el formato NNNNNNNNN o NNNNNNNNN-D")
         numero, digito = coincidencia.groups()
-        if digito_verificacion_nit(numero) != int(digito):
+        if digito is not None and digito_verificacion_nit(numero) != int(digito):
             raise ErrorDominio("El dígito de verificación del NIT no es válido")

@@ -58,5 +58,5 @@ Los 13 códigos son los del `INSERT INTO permisos` del script.
   y ANULADA desde cualquier estado no final. Algunos historiales del script saltan EN_REVISION
   (p. ej. RAD-2025-0001 pasa de RECIBIDA a APROBADA). Al reconstruir una cuenta desde la BD el
   historial se carga tal cual; las reglas de transición solo se aplican a los cambios nuevos.
-- Los NIT del script (`901234567`) no traen dígito de verificación; el dominio exige el formato
-  `NNNNNNNNN-D`. Los datos sintéticos del proyecto usan NIT con dígito válido.
+- El NIT se acepta como `NNNNNNNNN` o `NNNNNNNNN-D`. Solo cuando trae guion se comprueba el dígito
+  de verificación (algoritmo DIAN); así los NIT del script (`901234567`) siguen siendo válidos.

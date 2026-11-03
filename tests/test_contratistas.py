@@ -68,13 +68,16 @@ def test_digito_verificacion() -> None:
     assert digito_verificacion_nit("901234567") == 7
 
 
-def test_nit_valido() -> None:
-    contratista = PersonaJuridica(nombre_completo="Empresa Sintética S.A.S.", nit_cedula=NIT_VALIDO)
+@pytest.mark.parametrize("nit", [NIT_VALIDO, "900000001", "901234567"])
+def test_nit_valido_con_o_sin_digito(nit: str) -> None:
+    contratista = PersonaJuridica(nombre_completo="Empresa Sintética S.A.S.", nit_cedula=nit)
 
     assert contratista.tipo_persona is TipoPersona.JURIDICA
 
 
-@pytest.mark.parametrize("nit", ["900000001", "900000001-", "90000001-2", "1000000001"])
+@pytest.mark.parametrize(
+    "nit", ["900000001-", "90000001-2", "1000000001", "90000000A", "900000001-23"]
+)
 def test_nit_con_formato_invalido(nit: str) -> None:
     with pytest.raises(ErrorDominio, match="formato"):
         PersonaJuridica(nombre_completo="Empresa Sintética S.A.S.", nit_cedula=nit)
