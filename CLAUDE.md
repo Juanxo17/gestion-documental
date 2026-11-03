@@ -17,11 +17,11 @@ será pieza de portafolio.
   alargarlo.
 - Antes de cada concepto nuevo, explícalo en 5-10 líneas con un ejemplo mínimo
   ajeno al proyecto, y luego aplícalo.
-- Yo escribo la primera versión SOLO de estas piezas, y tú la corriges:
-  Documento abstracto y su jerarquía, eventos y comandos, EventPublisher y
-  EventSubscriber.
-- Todo lo demás (boilerplate, config, repositorios, API, Docker, estilos) lo
-  haces tú y yo lo leo.
+- Claude Code escribe todo el código (dominio, eventos, repositorios, API,
+  Docker, estilos) y yo lo leo.
+- Cada nota de docs/explicaciones/ se escribe en lenguaje simple, para alguien
+  que no domina Python: qué es, dónde está (archivo y clase exactos) y por qué.
+  Máximo 15 líneas por nota.
 - Al cerrar cada módulo, hazme 2-3 preguntas para comprobar que lo entendí.
   No avances hasta que responda.
 - No escribas código que yo no pueda justificar en una sustentación.
@@ -31,7 +31,8 @@ será pieza de portafolio.
 - No modificar el esquema de BD sin preguntar.
 - Cada tema del temario (docs/requisitos.md) debe tener un lugar identificable
   en el código y una nota corta en docs/explicaciones/.
-- Explica el porqué antes de implementar. Un módulo por vez. Modo plan primero.
+- Explica el porqué antes de implementar. Un módulo por vez. Modo build por
+  defecto; modo plan solo si lo pido.
 - Cada módulo incluye tests. Un commit por módulo.
 - Jerarquías de herencia: máximo 3 niveles. Preferir composición.
 - Nunca commitear secretos. La cadena de conexión de Atlas va en .env
@@ -73,8 +74,8 @@ La BD se inyecta con `Depends(get_db)`; los tests la reemplazan con
 
 ## Plan de la fase 1 (~6 h)
 0. Setup: estructura, .env, conexión a Atlas, /health (25 min, lo hace Claude Code)
-1. Dominio: Documento abstracto, jerarquía, mixins, composición, test de LSP (75 min, lo escribo yo)
-2. Eventos: eventos y comandos inmutables, EventPublisher, EventSubscriber, bus en memoria, 2 subscribers (75 min, lo escribo yo)
+1. Dominio: Documento abstracto, jerarquía, mixins, composición, test de LSP (75 min)
+2. Eventos: eventos y comandos inmutables, EventPublisher, EventSubscriber, bus en memoria, 2 subscribers (75 min)
 3. Persistencia: repositorio abstracto, implementación Mongo, implementación en memoria (50 min)
 4. Servicio + API: comando -> dominio -> repo -> evento, endpoints FastAPI (50 min)
 5. demo.py, tests, matriz de trazabilidad, notas en docs/explicaciones/ (45 min)
