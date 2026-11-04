@@ -11,7 +11,8 @@ export const OPCIONES_COOKIE = {
   maxAge: MINUTOS_SESION * 60,
 };
 
-export function errorSinBackend(): Response {
+export function errorSinBackend(destino: string, causa: unknown): Response {
+  console.error(`No se pudo contactar ${destino}:`, causa);
   return Response.json(
     {
       error: "BACKEND_NO_DISPONIBLE",

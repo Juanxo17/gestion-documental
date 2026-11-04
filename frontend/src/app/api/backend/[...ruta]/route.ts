@@ -33,8 +33,8 @@ async function reenviar(
       signal: AbortSignal.timeout(ESPERA_MAXIMA_MS),
       cache: "no-store",
     });
-  } catch {
-    return errorSinBackend();
+  } catch (causa) {
+    return errorSinBackend(destino, causa);
   }
   const salida = new Headers();
   for (const nombre of CABECERAS_DE_RESPUESTA) {

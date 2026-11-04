@@ -22,8 +22,8 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(ESPERA_MAXIMA_MS),
       cache: "no-store",
     });
-  } catch {
-    return errorSinBackend();
+  } catch (causa) {
+    return errorSinBackend(`${BACKEND_URL}/auth/login`, causa);
   }
   const cuerpo = await respuesta.json();
   if (!respuesta.ok) {
