@@ -119,11 +119,6 @@ Los repositorios de memoria y de MongoDB pasan la misma batería de pruebas (pri
 - **Frontend:** Vercel, con `frontend/` como raíz y la variable `BACKEND_URL`.
 - **CI:** GitHub Actions ejecuta ruff, mypy y pytest para el backend, y lint, typecheck y build para el frontend, en cada push y pull request.
 
-## Documentación
-
-- [Guía de uso](docs/guia-alexandra.pdf): recorrido con capturas, los 16 temas del curso en lenguaje simple y glosario.
-- [Guía técnica](docs/guia-tecnica.pdf): capas, flujo de eventos, decisiones, matriz de trazabilidad, riesgos y preguntas de sustentación.
-
 ## Estructura
 
 ```
@@ -138,7 +133,7 @@ Los repositorios de memoria y de MongoDB pasan la misma batería de pruebas (pri
 ├── tests/               pruebas de dominio, servicios, API y repositorios
 ├── scripts/seed.py      datos de ejemplo
 ├── demo.py              demostración en consola
-├── docs/                guías en PDF y diagrama
+├── docs/                diagrama de arquitectura
 ├── Dockerfile, docker-compose.yml, render.yaml
 └── .github/workflows/ci.yml
 ```
