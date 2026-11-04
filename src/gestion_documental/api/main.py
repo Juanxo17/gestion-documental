@@ -1,68 +1,57 @@
 from typing import Annotated, Any
 
-from bson.errors import InvalidId
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 from pymongo.database import Database
-from pymongo.errors import ConfigurationError, ConnectionFailure
 
+from gestion_documental.api.errores import registrar_manejadores
 from gestion_documental.api.rutas_auth import router as rutas_auth
+from gestion_documental.api.rutas_consultas import router_auditoria, router_dashboard
+from gestion_documental.api.rutas_contratistas import router as rutas_contratistas
+from gestion_documental.api.rutas_contratos import router as rutas_contratos
 from gestion_documental.api.rutas_cuentas import router as rutas_cuentas
-from gestion_documental.domain.errores import (
-    AccesoDenegadoError,
-    ErrorDominio,
-    TransicionInvalidaError,
-)
-from gestion_documental.repositories.base import RegistroDuplicadoError
+from gestion_documental.api.rutas_documentos import router as rutas_documentos
+from gestion_documental.api.rutas_usuarios import router as rutas_usuarios
+from gestion_documental.config import ConfiguracionApi, cargar
 from gestion_documental.repositories.conexion import get_db, ping
-from gestion_documental.services.servicio_auth import CredencialesInvalidasError
-from gestion_documental.services.servicio_cuentas import NoEncontradoError
 
-BD_NO_DISPONIBLE = {"status": "degraded", "db": "error"}
+ETIQUETAS = [
+    {"name": "auth", "description": "Inicio de sesión, usuario actual y cambio de contraseña"},
+    {"name": "usuarios", "description": "Administración de usuarios (usuarios.gestionar)"},
+    {"name": "contratistas", "description": "Personas naturales y jurídicas"},
+    {"name": "contratos", "description": "Contratos, vigencia y estados"},
+    {"name": "cuentas", "description": "Radicación y trámite de cuentas de cobro"},
+    {"name": "documentos", "description": "Adjuntos en GridFS o por URL"},
+    {"name": "auditoria", "description": "Eventos persistidos (solo Administrador)"},
+    {"name": "dashboard", "description": "Agregaciones por estado y contrato"},
+    {"name": "sistema", "description": "Salud de la API y de la base de datos"},
+]
 
-ESTADOS_POR_ERROR: dict[type[Exception], int] = {
-    ErrorDominio: 400,
-    InvalidId: 400,
-    CredencialesInvalidasError: 401,
-    AccesoDenegadoError: 403,
-    NoEncontradoError: 404,
-    RegistroDuplicadoError: 409,
-    TransicionInvalidaError: 409,
-}
-
-app = FastAPI(title="Gestión Documental")
-app.include_router(rutas_auth)
-app.include_router(rutas_cuentas)
-
-
-async def responder_bd_no_disponible(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=503, content=BD_NO_DISPONIBLE)
-
-
-async def responder_error_conocido(request: Request, exc: Exception) -> JSONResponse:
-    codigo = next(
-        ESTADOS_POR_ERROR[tipo] for tipo in type(exc).__mro__ if tipo in ESTADOS_POR_ERROR
-    )
-    cabeceras = {"WWW-Authenticate": "Bearer"} if codigo == 401 else None
-    return JSONResponse(status_code=codigo, content={"detail": str(exc)}, headers=cabeceras)
-
-
-async def responder_validacion(request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, ValidationError)
-    errores = exc.errors(include_url=False, include_context=False, include_input=False)
-    return JSONResponse(status_code=422, content={"detail": errores})
+app = FastAPI(title="Gestión Documental", openapi_tags=ETIQUETAS)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cargar(ConfiguracionApi).origenes,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+registrar_manejadores(app)
+for router in (
+    rutas_auth,
+    rutas_usuarios,
+    rutas_contratistas,
+    rutas_contratos,
+    rutas_cuentas,
+    rutas_documentos,
+    router_auditoria,
+    router_dashboard,
+):
+    app.include_router(router)
 
 
-app.add_exception_handler(ConfigurationError, responder_bd_no_disponible)
-app.add_exception_handler(ConnectionFailure, responder_bd_no_disponible)
-app.add_exception_handler(ValidationError, responder_validacion)
-for tipo_error in ESTADOS_POR_ERROR:
-    app.add_exception_handler(tipo_error, responder_error_conocido)
-
-
-@app.get("/health")
+@app.get("/health", tags=["sistema"])
 def health(db: Annotated[Database[dict[str, Any]], Depends(get_db)]) -> JSONResponse:
     if ping(db):
         return JSONResponse(status_code=200, content={"status": "ok", "db": "ok"})
-    return JSONResponse(status_code=503, content=BD_NO_DISPONIBLE)
+    return JSONResponse(status_code=503, content={"status": "degraded", "db": "error"})

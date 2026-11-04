@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -6,6 +7,7 @@ from typing import Any
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
 
+from gestion_documental.domain.contratistas import Contratista, PersonaJuridica, PersonaNatural
 from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.enums import EstadoCuenta, OrigenDocumento, TipoDocumento
 from gestion_documental.domain.tiempo import ahora_utc
@@ -19,15 +21,17 @@ from gestion_documental.events.eventos import (
     EventoDominio,
 )
 from gestion_documental.events.publicador import BusEventosEnMemoria
-from gestion_documental.repositories.base import RepositorioCuentas
+from gestion_documental.repositories.base import RepositorioCuentas, Repositorios
 from gestion_documental.repositories.memoria import (
-    RepositorioContratosEnMemoria,
-    RepositorioCuentasEnMemoria,
     RepositorioRolesEnMemoria,
     RepositorioUsuariosEnMemoria,
+    repositorios_en_memoria,
 )
 from gestion_documental.services.servicio_auth import ServicioAuth
+from gestion_documental.services.servicio_contratistas import ServicioContratistas
+from gestion_documental.services.servicio_contratos import ServicioContratos
 from gestion_documental.services.servicio_cuentas import ServicioCuentas
+from gestion_documental.services.servicio_usuarios import ServicioUsuarios
 
 
 def cuenta_radicada() -> CuentaRadicada:
@@ -71,6 +75,8 @@ def radicar() -> RadicarCuenta:
 
 
 CONTRATO_ID = "64b000000000000000000001"
+CONTRATISTA_ID = "64b000000000000000000002"
+CONTRATISTA_INACTIVO_ID = "64b000000000000000000004"
 USUARIO_ID = "64b0000000000000000000aa"
 
 
@@ -86,7 +92,7 @@ def contrato_en_memoria() -> Contrato:
     return Contrato(
         id=CONTRATO_ID,
         numero_contrato="CONT-SINT-001",
-        id_contratista="64b000000000000000000002",
+        id_contratista=CONTRATISTA_ID,
         objeto_contrato="Objeto sintético",
         valor_total=ValorMonetario(Decimal("10000000.00")),
         fecha_inicio=date(2026, 1, 1),
@@ -95,17 +101,25 @@ def contrato_en_memoria() -> Contrato:
     )
 
 
+def contratistas_sinteticos() -> list[Contratista]:
+    return [
+        PersonaJuridica(
+            id=CONTRATISTA_ID, nombre_completo="Empresa Sintética S.A.S.", nit_cedula="900000001-2"
+        ),
+        PersonaNatural(
+            id=CONTRATISTA_INACTIVO_ID,
+            nombre_completo="Persona Sintética Inactiva",
+            nit_cedula="1000000001",
+            activo=False,
+        ),
+    ]
+
+
 def servicio_en_memoria(
     cuentas: RepositorioCuentas | None = None,
 ) -> tuple[ServicioCuentas, RepositorioCuentas, Recolector]:
-    repositorio = cuentas if cuentas is not None else RepositorioCuentasEnMemoria()
-    bus = BusEventosEnMemoria()
-    recolector = Recolector()
-    bus.suscribir(EventoDominio, recolector)
-    servicio = ServicioCuentas(
-        repositorio, RepositorioContratosEnMemoria([contrato_en_memoria()]), bus
-    )
-    return servicio, repositorio, recolector
+    datos = escenario(cuentas)
+    return datos.cuentas(), datos.repos.cuentas, datos.recolector
 
 
 CONTRASENA = "Demo2025*"
@@ -181,3 +195,52 @@ def servicio_auth_en_memoria(
         reloj=reloj,
     )
     return servicio, usuarios
+
+
+@dataclass
+class Escenario:
+    repos: Repositorios
+    bus: BusEventosEnMemoria
+    recolector: Recolector
+
+    def usuario(self, correo: str) -> Usuario:
+        usuario = self.repos.usuarios.obtener_por_correo(correo)
+        assert usuario is not None
+        return usuario
+
+    def id_de(self, correo: str) -> str:
+        identificador = self.usuario(correo).id
+        assert identificador is not None
+        return identificador
+
+    def cuentas(self) -> ServicioCuentas:
+        r = self.repos
+        return ServicioCuentas(r.cuentas, r.contratos, r.contratistas, r.archivos, self.bus)
+
+    def contratos(self) -> ServicioContratos:
+        r = self.repos
+        return ServicioContratos(
+            r.contratos, r.contratistas, r.usuarios, r.roles, r.cuentas, self.bus
+        )
+
+    def contratistas(self) -> ServicioContratistas:
+        return ServicioContratistas(self.repos.contratistas)
+
+    def usuarios(self) -> ServicioUsuarios:
+        return ServicioUsuarios(self.repos.usuarios, self.repos.roles, HASHER_RAPIDO)
+
+
+def escenario(cuentas: RepositorioCuentas | None = None) -> Escenario:
+    roles = roles_sinteticos()
+    repos = repositorios_en_memoria(
+        contratos=[contrato_en_memoria()],
+        contratistas=contratistas_sinteticos(),
+        usuarios=usuarios_sinteticos(roles),
+        roles=roles,
+        cuentas=cuentas,
+    )
+    bus = BusEventosEnMemoria()
+    recolector = Recolector()
+    bus.suscribir(EventoDominio, recolector)
+    bus.suscribir(EventoDominio, repos.auditoria)
+    return Escenario(repos=repos, bus=bus, recolector=recolector)

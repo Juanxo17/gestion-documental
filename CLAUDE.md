@@ -65,15 +65,20 @@ será pieza de portafolio.
 Layout src/: el paquete es `src/gestion_documental/`. Flujo: `api/rutas_cuentas.py` recibe un
 comando Pydantic → `services/servicio_cuentas.py` valida con repositorios → dominio → `guardar`
 → publica el evento en el `EventPublisher` (solo si guardar tuvo éxito).
-- El servicio llega a las rutas por `Depends(get_servicio)` (`api/dependencias.py`); los tests
-  lo reemplazan con `app.dependency_overrides` y repositorios en memoria (`tests/fabricas.py`).
-- Errores → HTTP en `api/main.py`: `ErrorDominio` 400, `CredencialesInvalidasError` 401,
-  `AccesoDenegadoError` y subclases 403, `NoEncontradoError` 404,
-  `RegistroDuplicadoError`/`TransicionInvalidaError` 409, Mongo caído 503.
+- Inyección: `api/dependencias.py` arma un `Repositorios` (dataclass con todos los
+  repositorios, archivos GridFS y auditoría) desde `get_repositorios`, y de ahí cada servicio y
+  el bus por petición. Los tests reemplazan `get_repositorios`, `get_hasher` y `get_config_auth`
+  (fixture `api` en `tests/conftest.py`; datos en `tests/fabricas.py::escenario`).
+- Errores: tabla `ERRORES` en `api/errores.py` (excepción → estado HTTP y código); respuesta
+  uniforme `{"error", "detalle"}`. `/health` conserva su propio cuerpo.
 - Auth: `api/seguridad.py` define `usuario_actual` (JWT), `usuario_habilitado` (bloquea si
-  `debe_cambiar_contrasena`) y `requiere_permiso(codigo)`. El `id_usuario` de los comandos sale
-  del token. `JWT_SECRET`/`JWT_MINUTOS` van en `ConfiguracionAuth` (aparte de Mongo).
-  Tests de API: fixture `api` en `tests/conftest.py` (servicios en memoria, bcrypt de costo 4).
+  `debe_cambiar_contrasena`), `requiere_permiso(codigo)` y `requiere_rol(nombre)`. El
+  `id_usuario` de los comandos sale del token. Configuración: `ConfiguracionAuth` (JWT) y
+  `ConfiguracionApi` (CORS) van aparte de la de Mongo.
+- Eventos: el bus de la API tiene suscritos `AuditoriaMongo` (colección `auditoria`) y el
+  notificador. `CuentaPagada`/`CuentaAnulada` heredan de `EstadoCuentaCambiado`.
+- Adjuntos LOCAL: contenido en GridFS, `ruta_archivo` = id de GridFS; `datos_sinteticos.py`
+  genera PDFs válidos para seed, demo y tests.
 - Mapeo dominio ↔ BSON solo en `repositories/mapeo.py` (ids como ObjectId, dinero Decimal128,
   fechas sin hora como datetime UTC). El dominio genera fechas con `domain/tiempo.ahora_utc()`
   (milisegundos) para que la ida y vuelta con Mongo sea exacta.

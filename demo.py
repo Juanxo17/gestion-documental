@@ -6,6 +6,7 @@ from typing import Any
 
 from bson import ObjectId
 
+from gestion_documental.datos_sinteticos import pdf_sintetico
 from gestion_documental.domain.contratistas import PersonaJuridica
 from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.documentos import (
@@ -14,19 +15,16 @@ from gestion_documental.domain.documentos import (
     DocumentoPDF,
     DocumentoURL,
 )
-from gestion_documental.domain.enums import EstadoCuenta, OrigenDocumento, TipoDocumento
+from gestion_documental.domain.enums import EstadoCuenta, TipoDocumento
 from gestion_documental.domain.errores import TransicionInvalidaError
 from gestion_documental.domain.tiempo import ahora_utc
 from gestion_documental.domain.valores import ValorMonetario
-from gestion_documental.events.comandos import AdjuntarDocumento, CambiarEstadoCuenta, RadicarCuenta
+from gestion_documental.events.comandos import AdjuntarArchivo, CambiarEstadoCuenta, RadicarCuenta
 from gestion_documental.events.eventos import EstadoCuentaCambiado, EventoDominio
 from gestion_documental.events.publicador import BusEventosEnMemoria, EventSubscriber
 from gestion_documental.events.suscriptores import NotificadorSupervisor, RegistroAuditoria
-from gestion_documental.repositories.base import RepositorioContratos, RepositorioCuentas
-from gestion_documental.repositories.memoria import (
-    RepositorioContratosEnMemoria,
-    RepositorioCuentasEnMemoria,
-)
+from gestion_documental.repositories.base import Repositorios
+from gestion_documental.repositories.memoria import repositorios_en_memoria
 from gestion_documental.services.servicio_cuentas import ServicioCuentas
 
 CONTENIDO = b"contenido sintetico de la demo"
@@ -74,7 +72,7 @@ def documentos_mixtos(id_usuario: str) -> list[Documento]:
     ]
 
 
-def repositorios_en_memoria() -> tuple[RepositorioCuentas, RepositorioContratos, str, str]:
+def preparar_memoria() -> tuple[Repositorios, str, str]:
     contrato = Contrato(
         id=str(ObjectId()),
         numero_contrato="CONT-DEMO-001",
@@ -85,31 +83,18 @@ def repositorios_en_memoria() -> tuple[RepositorioCuentas, RepositorioContratos,
         fecha_fin=date(2026, 12, 31),
         id_supervisor=str(ObjectId()),
     )
-    return (
-        RepositorioCuentasEnMemoria(),
-        RepositorioContratosEnMemoria([contrato]),
-        contrato.numero_contrato,
-        str(ObjectId()),
-    )
+    return repositorios_en_memoria(contratos=[contrato]), contrato.numero_contrato, str(ObjectId())
 
 
-def repositorios_mongo() -> tuple[RepositorioCuentas, RepositorioContratos, str, str]:
+def preparar_mongo() -> tuple[Repositorios, str, str]:
     from gestion_documental.repositories.conexion import get_db
-    from gestion_documental.repositories.mongo import (
-        RepositorioContratosMongo,
-        RepositorioCuentasMongo,
-    )
+    from gestion_documental.repositories.mongo import repositorios_mongo
 
     db = get_db()
     radicador = db["usuarios"].find_one({"correo": "luz.paredes@entidad.gov.co"})
     if radicador is None:
         raise SystemExit("La base está vacía: ejecuta antes uv run python scripts/seed.py")
-    return (
-        RepositorioCuentasMongo(db),
-        RepositorioContratosMongo(db),
-        "CONT-2025-001",
-        str(radicador["_id"]),
-    )
+    return repositorios_mongo(db), "CONT-2025-001", str(radicador["_id"])
 
 
 def demo_abstraccion() -> None:
@@ -139,9 +124,9 @@ def demo_lsp(id_usuario: str) -> None:
 
 
 def demo_flujo(
-    cuentas: RepositorioCuentas, contratos: RepositorioContratos, contrato: str, usuario: str
+    repos: Repositorios, numero_contrato: str, usuario: str
 ) -> tuple[ServicioCuentas, str, ContadorPato]:
-    seccion("4. Flujo completo: radicar -> revisar -> aprobar")
+    seccion("4. Flujo completo: radicar -> adjuntar PDF -> revisar -> aprobar")
     bus = BusEventosEnMemoria()
     auditoria = RegistroAuditoria()
     notificador = NotificadorSupervisor()
@@ -149,7 +134,11 @@ def demo_flujo(
     bus.suscribir(EventoDominio, auditoria)
     bus.suscribir(EstadoCuentaCambiado, notificador)
     bus.suscribir(EventoDominio, pato)
-    servicio = ServicioCuentas(cuentas, contratos, bus)
+    servicio = ServicioCuentas(
+        repos.cuentas, repos.contratos, repos.contratistas, repos.archivos, bus
+    )
+    contrato = repos.contratos.obtener_por_numero(numero_contrato)
+    assert contrato is not None
 
     sufijo = ahora_utc().strftime("%Y%m%d%H%M%S")
     radicado = f"RAD-DEMO-{sufijo}"
@@ -158,27 +147,22 @@ def demo_flujo(
             id_usuario=usuario,
             numero_radicado=radicado,
             numero_cuenta=f"CUENTA-DEMO-{sufijo}",
-            numero_contrato=contrato,
+            numero_contrato=numero_contrato,
             valor_cobro=Decimal("2500000.00"),
             concepto_pago="Cuenta sintética de la demo",
-            fecha_presentacion=date(2026, 1, 31),
+            fecha_presentacion=contrato.fecha_inicio,
         )
     )
-    pdf = documentos_mixtos(usuario)[0]
-    assert isinstance(pdf, DocumentoPDF)
-    servicio.adjuntar(
-        AdjuntarDocumento(
+    documento = servicio.adjuntar_archivo(
+        AdjuntarArchivo(
             id_usuario=usuario,
             numero_radicado=radicado,
-            nombre_original=pdf.nombre_original,
-            ruta_archivo=pdf.ruta_archivo,
-            tipo=pdf.tipo,
-            origen=OrigenDocumento.LOCAL,
-            tipo_mime=pdf.tipo_mime,
-            hash_sha256=pdf.hash_sha256,
-            tamano_bytes=pdf.tamano_bytes,
-        )
+            nombre_original="cuenta_demo.pdf",
+            tipo=TipoDocumento.CUENTA_COBRO,
+        ),
+        pdf_sintetico("Cuenta de cobro sintética", radicado),
     )
+    print(f"Adjunto guardado como {type(documento).__name__} en {type(repos.archivos).__name__}")
     for estado in (EstadoCuenta.EN_REVISION, EstadoCuenta.APROBADA):
         servicio.cambiar_estado(
             CambiarEstadoCuenta(id_usuario=usuario, numero_radicado=radicado, nuevo_estado=estado)
@@ -217,16 +201,13 @@ def main() -> None:
     parser.add_argument("--mongo", action="store_true", help="usar MongoDB Atlas (.env)")
     argumentos = parser.parse_args()
 
-    if argumentos.mongo:
-        cuentas, contratos, contrato, usuario = repositorios_mongo()
-    else:
-        cuentas, contratos, contrato, usuario = repositorios_en_memoria()
-    print(f"Persistencia: {type(cuentas).__name__}")
+    repos, contrato, usuario = preparar_mongo() if argumentos.mongo else preparar_memoria()
+    print(f"Persistencia: {type(repos.cuentas).__name__}")
 
     demo_abstraccion()
     demo_herencia()
     demo_lsp(usuario)
-    servicio, radicado, pato = demo_flujo(cuentas, contratos, contrato, usuario)
+    servicio, radicado, pato = demo_flujo(repos, contrato, usuario)
     demo_duck_typing(pato)
     demo_transicion_invalida(servicio, radicado, usuario)
 

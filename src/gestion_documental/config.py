@@ -24,6 +24,16 @@ class ConfiguracionAuth(BaseSettings):
     jwt_minutos: int = Field(default=60, gt=0)
 
 
+class ConfiguracionApi(BaseSettings):
+    model_config = CONFIGURACION_ENV
+
+    cors_origins: str = ""
+
+    @property
+    def origenes(self) -> list[str]:
+        return [origen.strip() for origen in self.cors_origins.split(",") if origen.strip()]
+
+
 def cargar[T: BaseSettings](clase: type[T]) -> T:
     try:
         return clase()

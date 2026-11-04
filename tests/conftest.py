@@ -5,14 +5,18 @@ import pytest
 from fastapi.testclient import TestClient
 from pymongo.database import Database
 
-from gestion_documental.api.dependencias import get_servicio
+from gestion_documental.api.dependencias import get_hasher, get_repositorios
 from gestion_documental.api.main import app
-from gestion_documental.api.seguridad import get_servicio_auth
-from gestion_documental.config import ConfiguracionError, get_settings
+from gestion_documental.config import (
+    ConfiguracionAuth,
+    ConfiguracionError,
+    get_config_auth,
+    get_settings,
+)
 from gestion_documental.repositories.conexion import get_client
 from gestion_documental.repositories.indices import crear_indices
 from tests.cliente_api import ClienteApi
-from tests.fabricas import servicio_auth_en_memoria, servicio_en_memoria
+from tests.fabricas import HASHER_RAPIDO, SECRETO_PRUEBAS, escenario
 
 
 @pytest.fixture
@@ -31,9 +35,11 @@ def db_pruebas() -> Iterator[Database[dict[str, Any]]]:
 
 @pytest.fixture
 def api() -> Iterator[ClienteApi]:
-    servicio, _, _ = servicio_en_memoria()
-    servicio_auth, usuarios = servicio_auth_en_memoria()
-    app.dependency_overrides[get_servicio] = lambda: servicio
-    app.dependency_overrides[get_servicio_auth] = lambda: servicio_auth
-    yield ClienteApi(TestClient(app), usuarios)
+    datos = escenario()
+    app.dependency_overrides[get_repositorios] = lambda: datos.repos
+    app.dependency_overrides[get_hasher] = lambda: HASHER_RAPIDO
+    app.dependency_overrides[get_config_auth] = lambda: ConfiguracionAuth(
+        jwt_secret=SECRETO_PRUEBAS, jwt_minutos=30
+    )
+    yield ClienteApi(TestClient(app), datos)
     app.dependency_overrides.clear()

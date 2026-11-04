@@ -3,12 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from gestion_documental.api.dependencias import ServicioAuthDep
 from gestion_documental.api.esquemas import (
     SolicitudCambioContrasena,
     TokenRespuesta,
     UsuarioActualRespuesta,
 )
-from gestion_documental.api.seguridad import ServicioAuthDep, usuario_actual
+from gestion_documental.api.seguridad import usuario_actual
 from gestion_documental.services.servicio_auth import Sesion
 
 router = APIRouter(prefix="/auth", tags=["auth"])

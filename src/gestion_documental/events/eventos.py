@@ -5,7 +5,12 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gestion_documental.domain.enums import EstadoCuenta, OrigenDocumento, TipoDocumento
+from gestion_documental.domain.enums import (
+    EstadoContrato,
+    EstadoCuenta,
+    OrigenDocumento,
+    TipoDocumento,
+)
 
 
 class EventoDominio(BaseModel, ABC):
@@ -57,4 +62,48 @@ class DocumentoAdjuntado(EventoDominio):
         return (
             f"{self.id_usuario} adjuntó {self.nombre_original} ({self.tipo}, {self.origen}) "
             f"a la cuenta {self.numero_radicado}"
+        )
+
+
+class CuentaPagada(EstadoCuentaCambiado):
+    def describir(self) -> str:
+        return f"{self.id_usuario} registró el pago de la cuenta {self.numero_radicado}"
+
+
+class CuentaAnulada(EstadoCuentaCambiado):
+    def describir(self) -> str:
+        return (
+            f"{self.id_usuario} anuló la cuenta {self.numero_radicado} "
+            f"(estaba {self.estado_anterior})"
+        )
+
+
+class CuentaEditada(EventoDominio):
+    numero_radicado: str = Field(min_length=1)
+    campos: tuple[str, ...]
+
+    def describir(self) -> str:
+        return f"{self.id_usuario} editó la cuenta {self.numero_radicado}: {', '.join(self.campos)}"
+
+
+class DocumentoEliminado(EventoDominio):
+    numero_radicado: str = Field(min_length=1)
+    id_documento: str = Field(min_length=1)
+    nombre_original: str = Field(min_length=1)
+
+    def describir(self) -> str:
+        return (
+            f"{self.id_usuario} eliminó {self.nombre_original} de la cuenta {self.numero_radicado}"
+        )
+
+
+class ContratoCambiado(EventoDominio):
+    numero_contrato: str = Field(min_length=1)
+    estado_anterior: EstadoContrato
+    estado_nuevo: EstadoContrato
+
+    def describir(self) -> str:
+        return (
+            f"{self.id_usuario} cambió el contrato {self.numero_contrato} "
+            f"de {self.estado_anterior} a {self.estado_nuevo}"
         )

@@ -22,6 +22,7 @@ from gestion_documental.domain.enums import (
 )
 from gestion_documental.domain.usuarios import Rol, Usuario
 from gestion_documental.domain.valores import ValorMonetario
+from gestion_documental.events.auditoria import RegistroEvento
 
 Registro = dict[str, Any]
 
@@ -30,6 +31,7 @@ COLECCION_USUARIOS = "usuarios"
 COLECCION_CONTRATISTAS = "contratistas"
 COLECCION_CONTRATOS = "contratos"
 COLECCION_CUENTAS = "cuentas_cobro"
+COLECCION_AUDITORIA = "auditoria"
 COLECCIONES = (
     COLECCION_ROLES,
     COLECCION_USUARIOS,
@@ -78,6 +80,7 @@ def dict_a_documento(datos: Registro) -> Documento:
         "tipo": TipoDocumento(datos["tipo"]),
         "id_usuario": str(datos["id_usuario"]),
         "fecha_carga": datos["fecha_carga"],
+        "id_documento": datos["id_documento"],
     }
     if datos["origen"] == OrigenDocumento.URL:
         return DocumentoURL(**comunes)
@@ -265,4 +268,26 @@ def dict_a_usuario(datos: Registro) -> Usuario:
         bloqueado_hasta=datos["bloqueado_hasta"],
         debe_cambiar_contrasena=datos["debe_cambiar_contrasena"],
         fecha_registro=datos["fecha_registro"],
+    )
+
+
+def registro_a_dict(registro: RegistroEvento) -> Registro:
+    return {
+        "id_evento": registro.id_evento,
+        "tipo": registro.tipo,
+        "ocurrido_en": registro.ocurrido_en,
+        "id_usuario": registro.id_usuario,
+        "descripcion": registro.descripcion,
+        "datos": registro.datos,
+    }
+
+
+def dict_a_registro(datos: Registro) -> RegistroEvento:
+    return RegistroEvento(
+        id_evento=datos["id_evento"],
+        tipo=datos["tipo"],
+        ocurrido_en=datos["ocurrido_en"],
+        id_usuario=datos["id_usuario"],
+        descripcion=datos["descripcion"],
+        datos=datos["datos"],
     )

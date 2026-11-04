@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, fields
 from datetime import datetime
 from typing import Any, ClassVar
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from gestion_documental.domain.enums import OrigenDocumento, TipoDocumento
 from gestion_documental.domain.errores import ErrorDominio
@@ -24,6 +25,7 @@ class Documento(ABC):
     tipo: TipoDocumento
     id_usuario: str
     fecha_carga: datetime = field(default_factory=ahora_utc)
+    id_documento: str = field(default_factory=lambda: uuid4().hex)
 
     def __post_init__(self) -> None:
         self.validar()

@@ -54,7 +54,7 @@ def test_post_cuentas_duplicada_da_409(api: ClienteApi) -> None:
     respuesta = radicar(api)
 
     assert respuesta.status_code == 409
-    assert "RAD-API-0001" in respuesta.json()["detail"]
+    assert "RAD-API-0001" in respuesta.json()["detalle"]
 
 
 def test_post_cuentas_contrato_inexistente_da_404(api: ClienteApi) -> None:
@@ -78,7 +78,7 @@ def test_get_cuenta_inexistente_da_404(api: ClienteApi) -> None:
     respuesta = api.http.get("/cuentas/RAD-NO-EXISTE", headers=api.cabeceras(REVISOR))
 
     assert respuesta.status_code == 404
-    assert "RAD-NO-EXISTE" in respuesta.json()["detail"]
+    assert "RAD-NO-EXISTE" in respuesta.json()["detalle"]
 
 
 def test_post_estado_valido(api: ClienteApi) -> None:
@@ -96,7 +96,7 @@ def test_post_estado_transicion_invalida_da_409(api: ClienteApi) -> None:
     respuesta = cambiar_estado(api, "APROBADA")
 
     assert respuesta.status_code == 409
-    assert "RECIBIDA a APROBADA" in respuesta.json()["detail"]
+    assert "RECIBIDA a APROBADA" in respuesta.json()["detalle"]
 
 
 def test_get_cuentas_por_estado(api: ClienteApi) -> None:
@@ -108,8 +108,8 @@ def test_get_cuentas_por_estado(api: ClienteApi) -> None:
     recibidas = api.http.get("/cuentas", params={"estado": "RECIBIDA"}, headers=cabeceras)
     en_revision = api.http.get("/cuentas", params={"estado": "EN_REVISION"}, headers=cabeceras)
 
-    assert [c["numero_radicado"] for c in recibidas.json()] == ["RAD-API-0001"]
-    assert [c["numero_radicado"] for c in en_revision.json()] == ["RAD-API-0002"]
+    assert [c["numero_radicado"] for c in recibidas.json()["items"]] == ["RAD-API-0001"]
+    assert [c["numero_radicado"] for c in en_revision.json()["items"]] == ["RAD-API-0002"]
 
 
 def test_get_cuentas_estado_desconocido_da_422(api: ClienteApi) -> None:
@@ -129,6 +129,6 @@ def test_pagada_exige_ademas_cuentas_pagar(api: ClienteApi) -> None:
     con_permiso = cambiar_estado(api, "PAGADA", correo=ADMIN)
 
     assert sin_permiso.status_code == 403
-    assert "cuentas.pagar" in sin_permiso.json()["detail"]
+    assert "cuentas.pagar" in sin_permiso.json()["detalle"]
     assert con_permiso.status_code == 200
     assert con_permiso.json()["estado"] == "PAGADA"

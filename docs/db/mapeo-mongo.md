@@ -24,7 +24,11 @@ Este documento fija cómo se traduce a colecciones de MongoDB sin cambiar su sig
 | `usuarios` | usuarios | nombre, apellido, correo, id_rol, cargo, contrasena_hash, activo, ultimo_acceso, intentos_fallidos, bloqueado_hasta, debe_cambiar_contrasena, fecha_registro | `id_rol` → `roles._id` |
 | `contratistas` | contratistas | tipo_persona (`NATURAL`/`JURIDICA`), nombre_completo, nit_cedula, telefono, correo, direccion, activo | `tipo_persona` decide la subclase `PersonaNatural` o `PersonaJuridica` |
 | `contratos` | contratos, estados_contrato | id_contratista, numero_contrato, objeto_contrato, valor_total, fecha_inicio, fecha_fin, estado, id_supervisor | `estado` como string (`ACTIVO`, `SUSPENDIDO`, ...); `id_contratista` → `contratistas._id`; `id_supervisor` → `usuarios._id` |
-| `cuentas_cobro` | cuentas_cobro, estados_cuenta, historial_estado_cuenta, documentos_adjuntos, tipos_documento | id_contrato, numero_radicado, numero_cuenta, valor_cobro, concepto_pago, fecha_presentacion, estado, observaciones, id_usuario, fecha_registro, fecha_actualizacion, documentos, historial | `documentos`: lista de adjuntos (nombre_original, ruta_archivo, tipo, id_usuario, origen, fecha_carga, tipo_mime, hash_sha256, tamano_bytes); `historial`: lista de cambios (estado_anterior, estado_nuevo, id_usuario, fecha_cambio, observacion) |
+| `cuentas_cobro` | cuentas_cobro, estados_cuenta, historial_estado_cuenta, documentos_adjuntos, tipos_documento | id_contrato, numero_radicado, numero_cuenta, valor_cobro, concepto_pago, fecha_presentacion, estado, observaciones, id_usuario, fecha_registro, fecha_actualizacion, documentos, historial | `documentos`: lista de adjuntos (id_documento, nombre_original, ruta_archivo, tipo, id_usuario, origen, fecha_carga, tipo_mime, hash_sha256, tamano_bytes); `historial`: lista de cambios (estado_anterior, estado_nuevo, id_usuario, fecha_cambio, observacion) |
+| `auditoria` | (nuevo, no existe en el SQL) | id_evento, tipo, ocurrido_en, id_usuario, descripcion, datos | Un documento por evento de dominio, escrito por `AuditoriaMongo` |
+| `fs.files`, `fs.chunks` | columna `ruta_archivo` | Colecciones de GridFS | El contenido de los adjuntos LOCAL, partido en bloques de 255 KB |
+
+**Documentos y GridFS.** Para un adjunto LOCAL, `ruta_archivo` guarda el `_id` del archivo en GridFS (como texto). Para uno URL, guarda la URL. `id_documento` identifica el adjunto dentro de la cuenta (para descargarlo o eliminarlo). El `hash_sha256` y `tamano_bytes` se calculan al subir y la descarga verifica el hash antes de enviar.
 
 El catálogo de permisos (código, descripción, módulo) deja de ser tabla: el código es el
 dato que se guarda y el módulo es el prefijo del código (`cuentas.radicar` → `cuentas`).
@@ -41,7 +45,7 @@ Los 13 códigos son los del `INSERT INTO permisos` del script.
 | `cuentas_cobro` | `numero_radicado` | `uq_cuentas_cobro_radicado` |
 | `cuentas_cobro` | compuesto `(id_contrato, numero_cuenta)` | `uq_cuentas_cobro_contrato_cuenta` |
 
-Índices no únicos para las consultas frecuentes: `cuentas_cobro.estado`, `contratos.id_contratista`.
+Índices no únicos para las consultas frecuentes: `cuentas_cobro.estado`, `contratos.id_contratista`, `auditoria.ocurrido_en` (descendente) y `auditoria.tipo`.
 
 ## CHECK del SQL convertidos en validación del dominio
 

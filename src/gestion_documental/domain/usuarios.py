@@ -45,6 +45,9 @@ class Usuario:
     id: str | None = None
 
     def __post_init__(self) -> None:
+        self.validar()
+
+    def validar(self) -> None:
         if "@" not in self.correo:
             raise ErrorDominio("El correo del usuario no es válido")
         if self.intentos_fallidos < 0:
@@ -76,6 +79,13 @@ class Usuario:
         self.intentos_fallidos = 0
         self.bloqueado_hasta = None
         self.ultimo_acceso = ahora
+
+    def desactivar(self) -> None:
+        self.activo = False
+
+    def reiniciar_bloqueo(self) -> None:
+        self.intentos_fallidos = 0
+        self.bloqueado_hasta = None
 
     def cambiar_contrasena(self, nuevo_hash: str) -> None:
         self.contrasena_hash = nuevo_hash

@@ -33,9 +33,16 @@ class Contratista(AuditableMixin, ABC):
     id: str | None = None
 
     def __post_init__(self) -> None:
+        self.validar()
+
+    def validar(self) -> None:
         if not self.nombre_completo.strip():
             raise ErrorDominio("El contratista necesita nombre_completo")
         self.validar_identificacion()
+
+    def desactivar(self, id_usuario: str) -> None:
+        self.activo = False
+        self.registrar_modificacion(id_usuario)
 
     @abstractmethod
     def validar_identificacion(self) -> None: ...

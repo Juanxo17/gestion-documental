@@ -5,7 +5,11 @@ from typing import Final
 
 from gestion_documental.domain.documentos import Documento
 from gestion_documental.domain.enums import EstadoCuenta
-from gestion_documental.domain.errores import ErrorDominio, TransicionInvalidaError
+from gestion_documental.domain.errores import (
+    ErrorDominio,
+    NoEncontradoError,
+    TransicionInvalidaError,
+)
 from gestion_documental.domain.tiempo import ahora_utc
 from gestion_documental.domain.valores import ValorMonetario
 
@@ -19,6 +23,7 @@ TRANSICIONES: Final[dict[EstadoCuenta, frozenset[EstadoCuenta]]] = {
     EstadoCuenta.PAGADA: frozenset(),
     EstadoCuenta.ANULADA: frozenset(),
 }
+ESTADOS_EDITABLES: Final = frozenset({EstadoCuenta.RECIBIDA, EstadoCuenta.EN_REVISION})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -87,6 +92,59 @@ class CuentaCobro:
     @property
     def historial(self) -> tuple[CambioEstado, ...]:
         return tuple(self._historial)
+
+    @property
+    def es_editable(self) -> bool:
+        return self.estado in ESTADOS_EDITABLES
+
+    def verificar_editable(self) -> None:
+        if not self.es_editable:
+            raise ErrorDominio(
+                f"La cuenta está {self.estado}; solo se modifica en RECIBIDA o EN_REVISION"
+            )
+
+    def editar(
+        self,
+        *,
+        numero_cuenta: str | None = None,
+        valor_cobro: ValorMonetario | None = None,
+        concepto_pago: str | None = None,
+        fecha_presentacion: date | None = None,
+        observaciones: str | None = None,
+    ) -> list[str]:
+        self.verificar_editable()
+        cambios: dict[str, object] = {
+            "numero_cuenta": numero_cuenta,
+            "valor_cobro": valor_cobro,
+            "concepto_pago": concepto_pago,
+            "fecha_presentacion": fecha_presentacion,
+            "observaciones": observaciones,
+        }
+        modificados = [
+            campo
+            for campo, valor in cambios.items()
+            if valor is not None and valor != getattr(self, campo)
+        ]
+        for campo in ("numero_cuenta", "concepto_pago"):
+            if campo in modificados and not str(cambios[campo]).strip():
+                raise ErrorDominio(f"La cuenta necesita {campo}")
+        for campo in modificados:
+            setattr(self, campo, cambios[campo])
+        return modificados
+
+    def documento(self, id_documento: str) -> Documento:
+        for documento in self._documentos:
+            if documento.id_documento == id_documento:
+                return documento
+        raise NoEncontradoError(
+            f"La cuenta {self.numero_radicado} no tiene el documento {id_documento}"
+        )
+
+    def eliminar_documento(self, id_documento: str) -> Documento:
+        self.verificar_editable()
+        documento = self.documento(id_documento)
+        self._documentos.remove(documento)
+        return documento
 
     def agregar_documento(self, documento: Documento) -> None:
         if self.es_final:

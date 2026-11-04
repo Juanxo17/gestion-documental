@@ -16,3 +16,15 @@ class UsuarioInactivoError(AccesoDenegadoError):
 
 class UsuarioBloqueadoError(AccesoDenegadoError):
     pass
+
+
+class NoEncontradoError(Exception):
+    pass
+
+
+class ArchivoInvalidoError(ErrorDominio):
+    pass
+
+
+class ArchivoDemasiadoGrandeError(ArchivoInvalidoError):
+    pass

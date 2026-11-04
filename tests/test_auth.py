@@ -53,7 +53,7 @@ def test_cinco_fallos_bloquean_aunque_luego_acierte(api: ClienteApi) -> None:
     respuesta = api.login(RADICADOR)
 
     assert respuesta.status_code == 403
-    assert "bloqueado" in respuesta.json()["detail"]
+    assert "bloqueado" in respuesta.json()["detalle"]
 
 
 def test_bloqueo_vence_a_los_quince_minutos() -> None:
@@ -88,7 +88,7 @@ def test_usuario_inactivo_no_entra(api: ClienteApi) -> None:
     respuesta = api.login("inactivo@example.com")
 
     assert respuesta.status_code == 403
-    assert "inactivo" in respuesta.json()["detail"]
+    assert "inactivo" in respuesta.json()["detalle"]
 
 
 def test_usuario_inactivo_en_servicio() -> None:
@@ -140,7 +140,7 @@ def test_rol_consulta_no_puede_radicar(api: ClienteApi) -> None:
     )
 
     assert respuesta.status_code == 403
-    assert "cuentas.radicar" in respuesta.json()["detail"]
+    assert "cuentas.radicar" in respuesta.json()["detalle"]
 
 
 def test_permiso_faltante_da_403(api: ClienteApi) -> None:
@@ -151,7 +151,7 @@ def test_permiso_faltante_da_403(api: ClienteApi) -> None:
     )
 
     assert respuesta.status_code == 403
-    assert "cuentas.cambiar_estado" in respuesta.json()["detail"]
+    assert "cuentas.cambiar_estado" in respuesta.json()["detalle"]
 
 
 def test_cambio_obligatorio_de_contrasena(api: ClienteApi) -> None:
@@ -167,7 +167,7 @@ def test_cambio_obligatorio_de_contrasena(api: ClienteApi) -> None:
     permitido = api.http.get("/cuentas", params={"estado": "RECIBIDA"}, headers=cabeceras)
 
     assert bloqueado.status_code == 403
-    assert "cambiar su contraseña" in bloqueado.json()["detail"]
+    assert "cambiar su contraseña" in bloqueado.json()["detalle"]
     assert me.status_code == 200
     assert me.json()["debe_cambiar_contrasena"] is True
     assert cambio.status_code == 204
@@ -194,4 +194,4 @@ def test_cambio_de_contrasena_invalido_da_400(
     )
 
     assert respuesta.status_code == 400
-    assert mensaje in respuesta.json()["detail"]
+    assert mensaje in respuesta.json()["detalle"]

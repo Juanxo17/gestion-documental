@@ -37,3 +37,18 @@ class AdjuntarDocumento(Comando):
     tipo_mime: str | None = Field(default=None, max_length=100)
     hash_sha256: str | None = None
     tamano_bytes: int | None = Field(default=None, gt=0)
+
+
+class EditarCuenta(Comando):
+    numero_radicado: str = Field(min_length=1)
+    numero_cuenta: str | None = Field(default=None, min_length=1, max_length=30)
+    valor_cobro: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+    concepto_pago: str | None = Field(default=None, min_length=1)
+    fecha_presentacion: date | None = None
+    observaciones: str | None = None
+
+
+class AdjuntarArchivo(Comando):
+    numero_radicado: str = Field(min_length=1)
+    nombre_original: str = Field(min_length=1, max_length=255)
+    tipo: TipoDocumento

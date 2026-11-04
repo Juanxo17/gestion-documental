@@ -5,16 +5,25 @@ from typing import Any
 from bson import ObjectId
 from pymongo.database import Database
 
+from gestion_documental.datos_sinteticos import pdf_sintetico
+from gestion_documental.domain.archivos import sha256
 from gestion_documental.domain.contratistas import Contratista, PersonaJuridica, PersonaNatural
 from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.cuenta_cobro import CambioEstado, CuentaCobro
-from gestion_documental.domain.documentos import Documento, DocumentoPDF, DocumentoURL
+from gestion_documental.domain.documentos import (
+    MIME_PDF,
+    Documento,
+    DocumentoPDF,
+    DocumentoURL,
+)
 from gestion_documental.domain.enums import EstadoContrato, EstadoCuenta, TipoDocumento
 from gestion_documental.domain.usuarios import Rol, Usuario
 from gestion_documental.domain.valores import ValorMonetario
+from gestion_documental.repositories.base import RepositorioArchivos
 from gestion_documental.repositories.conexion import get_db
 from gestion_documental.repositories.indices import crear_indices
 from gestion_documental.repositories.mapeo import (
+    COLECCION_AUDITORIA,
     COLECCION_CONTRATISTAS,
     COLECCION_CONTRATOS,
     COLECCION_ROLES,
@@ -25,10 +34,14 @@ from gestion_documental.repositories.mapeo import (
     rol_a_dict,
     usuario_a_dict,
 )
-from gestion_documental.repositories.mongo import RepositorioCuentasMongo
+from gestion_documental.repositories.mongo import (
+    RepositorioArchivosGridFS,
+    RepositorioCuentasMongo,
+)
 from gestion_documental.services.servicio_auth import hasher_por_defecto
 
 CONTRASENA_DEMO = "Demo2025*"
+COLECCIONES_EXTRA = (COLECCION_AUDITORIA, "fs.files", "fs.chunks")
 
 PERMISOS = {
     1: "usuarios.gestionar",
@@ -294,12 +307,18 @@ def cargar_contratos(
     )
 
 
-def documentos_de(id_cuenta: int, id_usuario: str, fecha: datetime) -> list[Documento]:
+def documentos_de(
+    id_cuenta: int,
+    radicado: str,
+    id_usuario: str,
+    fecha: datetime,
+    archivos: RepositorioArchivos,
+) -> list[Documento]:
     documentos: list[Documento] = []
-    for cuenta, tipo, nombre, hash_sha256, tamano in DOCUMENTOS:
+    for cuenta, tipo, nombre, hash_sql, _ in DOCUMENTOS:
         if cuenta != id_cuenta:
             continue
-        if hash_sha256 is None:
+        if hash_sql is None:
             documentos.append(
                 DocumentoURL(
                     nombre_original=nombre,
@@ -310,16 +329,19 @@ def documentos_de(id_cuenta: int, id_usuario: str, fecha: datetime) -> list[Docu
                 )
             )
         else:
+            contenido = pdf_sintetico(
+                "Documento sintético de prueba", nombre, f"Cuenta {radicado}", f"Tipo {tipo}"
+            )
             documentos.append(
                 DocumentoPDF(
                     nombre_original=nombre,
-                    ruta_archivo=f"/uploads/{nombre}",
+                    ruta_archivo=archivos.guardar(nombre, contenido, MIME_PDF),
                     tipo=tipo,
                     id_usuario=id_usuario,
                     fecha_carga=fecha,
-                    tipo_mime="application/pdf",
-                    hash_sha256=hash_sha256,
-                    tamano_bytes=tamano,
+                    tipo_mime=MIME_PDF,
+                    hash_sha256=sha256(contenido),
+                    tamano_bytes=len(contenido),
                 )
             )
     return documentos
@@ -331,6 +353,7 @@ def cargar_cuentas(
     ids_usuarios: dict[int, ObjectId],
 ) -> None:
     repositorio = RepositorioCuentasMongo(db)
+    archivos = RepositorioArchivosGridFS(db)
     for (
         id_cuenta,
         id_contrato,
@@ -364,7 +387,9 @@ def cargar_cuentas(
                 fecha_presentacion=date.fromisoformat(fecha),
                 id_usuario=radicador,
                 observaciones=observ,
-                documentos=documentos_de(id_cuenta, radicador, historial[0].fecha_cambio),
+                documentos=documentos_de(
+                    id_cuenta, radicado, radicador, historial[0].fecha_cambio, archivos
+                ),
                 historial=historial,
             )
         )
@@ -372,7 +397,7 @@ def cargar_cuentas(
 
 def main() -> None:
     db = get_db()
-    for coleccion in COLECCIONES:
+    for coleccion in (*COLECCIONES, *COLECCIONES_EXTRA):
         db.drop_collection(coleccion)
     crear_indices(db)
 
@@ -390,6 +415,7 @@ def main() -> None:
     print(f"Base de datos: {db.name}")
     for coleccion in COLECCIONES:
         print(f"  {coleccion}: {db[coleccion].count_documents({})}")
+    print(f"  archivos en GridFS: {db['fs.files'].count_documents({})}")
     imprimir_usuarios_demo()
 
 
