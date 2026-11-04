@@ -8,12 +8,44 @@ from gestion_documental.domain.cuenta_cobro import CuentaCobro
 from gestion_documental.domain.enums import EstadoCuenta, OrigenDocumento, TipoDocumento
 
 
-class SolicitudCambioEstado(BaseModel):
+class Solicitud(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    id_usuario: str = Field(min_length=1)
+
+class SolicitudRadicacion(Solicitud):
+    numero_radicado: str
+    numero_cuenta: str
+    numero_contrato: str
+    valor_cobro: Decimal
+    concepto_pago: str
+    fecha_presentacion: date
+    observaciones: str | None = None
+
+
+class SolicitudCambioEstado(Solicitud):
     nuevo_estado: EstadoCuenta
     observacion: str | None = Field(default=None, max_length=300)
+
+
+class SolicitudCambioContrasena(BaseModel):
+    contrasena_actual: str
+    contrasena_nueva: str
+
+
+class TokenRespuesta(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UsuarioActualRespuesta(BaseModel):
+    id: str
+    nombre: str
+    apellido: str
+    correo: str
+    cargo: str
+    rol: str
+    permisos: list[str]
+    debe_cambiar_contrasena: bool
 
 
 class DocumentoRespuesta(BaseModel):

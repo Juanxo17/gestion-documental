@@ -67,8 +67,13 @@ comando Pydantic → `services/servicio_cuentas.py` valida con repositorios → 
 → publica el evento en el `EventPublisher` (solo si guardar tuvo éxito).
 - El servicio llega a las rutas por `Depends(get_servicio)` (`api/dependencias.py`); los tests
   lo reemplazan con `app.dependency_overrides` y repositorios en memoria (`tests/fabricas.py`).
-- Errores → HTTP en `api/main.py`: `ErrorDominio` 400, `NoEncontradoError` 404,
+- Errores → HTTP en `api/main.py`: `ErrorDominio` 400, `CredencialesInvalidasError` 401,
+  `AccesoDenegadoError` y subclases 403, `NoEncontradoError` 404,
   `RegistroDuplicadoError`/`TransicionInvalidaError` 409, Mongo caído 503.
+- Auth: `api/seguridad.py` define `usuario_actual` (JWT), `usuario_habilitado` (bloquea si
+  `debe_cambiar_contrasena`) y `requiere_permiso(codigo)`. El `id_usuario` de los comandos sale
+  del token. `JWT_SECRET`/`JWT_MINUTOS` van en `ConfiguracionAuth` (aparte de Mongo).
+  Tests de API: fixture `api` en `tests/conftest.py` (servicios en memoria, bcrypt de costo 4).
 - Mapeo dominio ↔ BSON solo en `repositories/mapeo.py` (ids como ObjectId, dinero Decimal128,
   fechas sin hora como datetime UTC). El dominio genera fechas con `domain/tiempo.ahora_utc()`
   (milisegundos) para que la ida y vuelta con Mongo sea exacta.

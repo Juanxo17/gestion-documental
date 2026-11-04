@@ -23,13 +23,18 @@ lenguaje simple están en `docs/explicaciones/`.
 | 15. Métodos abstractos, interfaces y virtualización | `Documento`, `Contratista`, `EventoDominio`, `EventPublisher`, `EventSubscriber` y los repositorios son ABC con `@abstractmethod` | `domain/`, `events/publicador.py`, `repositories/base.py` | `uv run python demo.py` (sección 1); `uv run pytest -k "instanciar or abstracto"` |
 | 16. Duck typing en Python | El bus tipa suscriptores con el `Protocol` `ManejadorEventos`: basta tener `manejar()` | `events/publicador.py` | `uv run python demo.py` (sección 5: `ContadorPato`); `uv run pytest tests/test_bus_eventos.py::test_duck_typing_suscriptor_sin_herencia` |
 
+## Componentes adicionales (fuera del temario)
+
+| Componente | Decisión | Archivos | Cómo demostrarlo en vivo |
+|------------|----------|----------|--------------------------|
+| Autenticación y control de acceso por roles | Login con JWT (HS256) y contraseñas con hash bcrypt; permisos por rol según la matriz del diseño; el `id_usuario` de los comandos sale del token; reglas de bloqueo, inactividad y cambio obligatorio en el dominio | `domain/usuarios.py`, `services/servicio_auth.py`, `api/seguridad.py`, `api/rutas_auth.py` | `uv run pytest tests/test_auth.py`; en `/docs`, botón *Authorize* con `ana.rodriguez@entidad.gov.co` / `Demo2025*` (tras el seed); `docs/explicaciones/17-autenticacion-roles.md` |
+
 ## Fuera de alcance
 
 | Elemento | Por qué no se implementó |
 |----------|--------------------------|
-| Autenticación y roles en la API | Los roles y permisos ya existen en la BD (`roles.permisos`), pero aplicarlos exige login, tokens y verificación por endpoint. No es parte del temario y se dejó para la fase 2. Hoy el `id_usuario` llega en el cuerpo de la petición. |
 | Endpoint para adjuntar documentos | `ServicioCuentas.adjuntar()` está implementado y probado (`tests/test_servicio.py`); falta exponerlo en HTTP con subida real de archivos, que implica almacenamiento de archivos. |
-| Frontend (Next.js) | Fase 2 del plan. La API ya expone lo necesario y su documentación interactiva está en `/docs`. |
+| Frontend (Next.js) | Fase 2 del plan. La API ya expone lo necesario, con autenticación, y su documentación interactiva está en `/docs`. |
 | Docker y Docker Compose | Fase 3. El proyecto se instala con un solo comando (`uv sync`) y Atlas es un servicio gestionado, así que no se necesita para la entrega. |
 | Validación `$jsonSchema` en MongoDB | Las reglas (CHECK del SQL, transiciones, NIT) viven en el dominio y se prueban sin red. Duplicarlas en la BD obligaría a mantenerlas en dos lugares; solo los índices únicos quedan en Mongo, porque garantizan unicidad incluso con escrituras concurrentes. |
 | Bus de eventos distribuido (RabbitMQ, Kafka) | El bus en memoria es síncrono y suficiente para un proceso. Gracias a `EventPublisher`, cambiarlo no afecta al servicio ni a los suscriptores. |

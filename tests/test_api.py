@@ -1,15 +1,14 @@
-from collections.abc import Iterator
 from typing import Any
 
-import pytest
-from fastapi.testclient import TestClient
+from httpx2 import Response
 
-from gestion_documental.api.dependencias import get_servicio
-from gestion_documental.api.main import app
-from tests.fabricas import USUARIO_ID, servicio_en_memoria
+from tests.cliente_api import ClienteApi
+
+RADICADOR = "radicador@example.com"
+REVISOR = "revisor@example.com"
+ADMIN = "administrador@example.com"
 
 CUENTA: dict[str, Any] = {
-    "id_usuario": USUARIO_ID,
     "numero_radicado": "RAD-API-0001",
     "numero_cuenta": "CUENTA-001",
     "numero_contrato": "CONT-SINT-001",
@@ -19,99 +18,117 @@ CUENTA: dict[str, Any] = {
 }
 
 
-@pytest.fixture
-def cliente() -> Iterator[TestClient]:
-    servicio, _, _ = servicio_en_memoria()
-    app.dependency_overrides[get_servicio] = lambda: servicio
-    yield TestClient(app)
-    app.dependency_overrides.clear()
+def radicar(api: ClienteApi, **cambios: Any) -> Response:
+    return api.http.post("/cuentas", json={**CUENTA, **cambios}, headers=api.cabeceras(RADICADOR))
 
 
-def cambiar_estado(cliente: TestClient, estado: str, radicado: str = "RAD-API-0001") -> Any:
-    return cliente.post(
+def cambiar_estado(
+    api: ClienteApi, estado: str, radicado: str = "RAD-API-0001", correo: str = REVISOR
+) -> Response:
+    return api.http.post(
         f"/cuentas/{radicado}/estado",
-        json={"id_usuario": USUARIO_ID, "nuevo_estado": estado, "observacion": "Prueba"},
+        json={"nuevo_estado": estado, "observacion": "Prueba"},
+        headers=api.cabeceras(correo),
     )
 
 
-def test_post_cuentas_radica(cliente: TestClient) -> None:
-    respuesta = cliente.post("/cuentas", json=CUENTA)
+def test_post_cuentas_radica_con_el_usuario_del_token(api: ClienteApi) -> None:
+    respuesta = radicar(api)
 
     assert respuesta.status_code == 201
     cuerpo = respuesta.json()
+    radicador = api.usuarios.obtener_por_correo(RADICADOR)
+    assert radicador is not None
     assert cuerpo["estado"] == "RECIBIDA"
     assert cuerpo["valor_cobro"] == "1500000.00"
-    assert len(cuerpo["historial"]) == 1
+    assert cuerpo["historial"][0]["id_usuario"] == radicador.id
 
 
-def test_post_cuentas_duplicada_da_409(cliente: TestClient) -> None:
-    cliente.post("/cuentas", json=CUENTA)
+def test_post_cuentas_rechaza_id_usuario_en_el_cuerpo(api: ClienteApi) -> None:
+    assert radicar(api, id_usuario="otro").status_code == 422
 
-    respuesta = cliente.post("/cuentas", json=CUENTA)
+
+def test_post_cuentas_duplicada_da_409(api: ClienteApi) -> None:
+    radicar(api)
+
+    respuesta = radicar(api)
 
     assert respuesta.status_code == 409
     assert "RAD-API-0001" in respuesta.json()["detail"]
 
 
-def test_post_cuentas_contrato_inexistente_da_404(cliente: TestClient) -> None:
-    respuesta = cliente.post("/cuentas", json={**CUENTA, "numero_contrato": "CONT-X"})
-
-    assert respuesta.status_code == 404
+def test_post_cuentas_contrato_inexistente_da_404(api: ClienteApi) -> None:
+    assert radicar(api, numero_contrato="CONT-X").status_code == 404
 
 
-def test_post_cuentas_datos_invalidos_da_422(cliente: TestClient) -> None:
-    respuesta = cliente.post("/cuentas", json={**CUENTA, "valor_cobro": "-5"})
-
-    assert respuesta.status_code == 422
+def test_post_cuentas_datos_invalidos_da_422(api: ClienteApi) -> None:
+    assert radicar(api, valor_cobro="-5").status_code == 422
 
 
-def test_get_cuenta(cliente: TestClient) -> None:
-    cliente.post("/cuentas", json=CUENTA)
+def test_get_cuenta(api: ClienteApi) -> None:
+    radicar(api)
 
-    respuesta = cliente.get("/cuentas/RAD-API-0001")
+    respuesta = api.http.get("/cuentas/RAD-API-0001", headers=api.cabeceras(REVISOR))
 
     assert respuesta.status_code == 200
     assert respuesta.json()["numero_cuenta"] == "CUENTA-001"
 
 
-def test_get_cuenta_inexistente_da_404(cliente: TestClient) -> None:
-    respuesta = cliente.get("/cuentas/RAD-NO-EXISTE")
+def test_get_cuenta_inexistente_da_404(api: ClienteApi) -> None:
+    respuesta = api.http.get("/cuentas/RAD-NO-EXISTE", headers=api.cabeceras(REVISOR))
 
     assert respuesta.status_code == 404
     assert "RAD-NO-EXISTE" in respuesta.json()["detail"]
 
 
-def test_post_estado_valido(cliente: TestClient) -> None:
-    cliente.post("/cuentas", json=CUENTA)
+def test_post_estado_valido(api: ClienteApi) -> None:
+    radicar(api)
 
-    respuesta = cambiar_estado(cliente, "EN_REVISION")
+    respuesta = cambiar_estado(api, "EN_REVISION")
 
     assert respuesta.status_code == 200
     assert respuesta.json()["estado"] == "EN_REVISION"
 
 
-def test_post_estado_transicion_invalida_da_409(cliente: TestClient) -> None:
-    cliente.post("/cuentas", json=CUENTA)
+def test_post_estado_transicion_invalida_da_409(api: ClienteApi) -> None:
+    radicar(api)
 
-    respuesta = cambiar_estado(cliente, "PAGADA")
+    respuesta = cambiar_estado(api, "APROBADA")
 
     assert respuesta.status_code == 409
-    assert "RECIBIDA a PAGADA" in respuesta.json()["detail"]
+    assert "RECIBIDA a APROBADA" in respuesta.json()["detail"]
 
 
-def test_get_cuentas_por_estado(cliente: TestClient) -> None:
-    cliente.post("/cuentas", json=CUENTA)
-    cliente.post(
-        "/cuentas", json={**CUENTA, "numero_radicado": "RAD-API-0002", "numero_cuenta": "C-2"}
-    )
-    cambiar_estado(cliente, "EN_REVISION", "RAD-API-0002")
+def test_get_cuentas_por_estado(api: ClienteApi) -> None:
+    radicar(api)
+    radicar(api, numero_radicado="RAD-API-0002", numero_cuenta="C-2")
+    cambiar_estado(api, "EN_REVISION", "RAD-API-0002")
+    cabeceras = api.cabeceras(REVISOR)
 
-    recibidas = cliente.get("/cuentas", params={"estado": "RECIBIDA"})
-    en_revision = cliente.get("/cuentas", params={"estado": "EN_REVISION"})
+    recibidas = api.http.get("/cuentas", params={"estado": "RECIBIDA"}, headers=cabeceras)
+    en_revision = api.http.get("/cuentas", params={"estado": "EN_REVISION"}, headers=cabeceras)
 
     assert [c["numero_radicado"] for c in recibidas.json()] == ["RAD-API-0001"]
     assert [c["numero_radicado"] for c in en_revision.json()] == ["RAD-API-0002"]
 
 
-def test_get_cuentas_estado_desconocido_da_422(cliente: TestClient) -> None:
-    assert cliente.get("/cuentas", params={"estado": "PERDIDA"}).status_code == 422
+def test_get_cuentas_estado_desconocido_da_422(api: ClienteApi) -> None:
+    respuesta = api.http.get(
+        "/cuentas", params={"estado": "PERDIDA"}, headers=api.cabeceras(REVISOR)
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_pagada_exige_ademas_cuentas_pagar(api: ClienteApi) -> None:
+    radicar(api)
+    cambiar_estado(api, "EN_REVISION")
+    cambiar_estado(api, "APROBADA")
+
+    sin_permiso = cambiar_estado(api, "PAGADA", correo=REVISOR)
+    con_permiso = cambiar_estado(api, "PAGADA", correo=ADMIN)
+
+    assert sin_permiso.status_code == 403
+    assert "cuentas.pagar" in sin_permiso.json()["detail"]
+    assert con_permiso.status_code == 200
+    assert con_permiso.json()["estado"] == "PAGADA"

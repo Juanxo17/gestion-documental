@@ -10,6 +10,7 @@ from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.cuenta_cobro import CambioEstado, CuentaCobro
 from gestion_documental.domain.documentos import Documento, DocumentoPDF, DocumentoURL
 from gestion_documental.domain.enums import EstadoContrato, EstadoCuenta, TipoDocumento
+from gestion_documental.domain.usuarios import Rol, Usuario
 from gestion_documental.domain.valores import ValorMonetario
 from gestion_documental.repositories.conexion import get_db
 from gestion_documental.repositories.indices import crear_indices
@@ -21,10 +22,13 @@ from gestion_documental.repositories.mapeo import (
     COLECCIONES,
     contratista_a_dict,
     contrato_a_dict,
+    rol_a_dict,
+    usuario_a_dict,
 )
 from gestion_documental.repositories.mongo import RepositorioCuentasMongo
+from gestion_documental.services.servicio_auth import hasher_por_defecto
 
-HASH_BCRYPT_FALSO = "$2b$12$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0"
+CONTRASENA_DEMO = "Demo2025*"
 
 PERMISOS = {
     1: "usuarios.gestionar",
@@ -164,13 +168,14 @@ def nuevos_ids(cantidad: int) -> dict[int, ObjectId]:
 
 def cargar_roles(db: Database[dict[str, Any]], ids: dict[int, ObjectId]) -> None:
     db[COLECCION_ROLES].insert_many(
-        {
-            "_id": ids[id_rol],
-            "nombre": nombre,
-            "descripcion": descripcion,
-            "activo": True,
-            "permisos": [PERMISOS[id_permiso] for id_permiso in permisos],
-        }
+        rol_a_dict(
+            Rol(
+                id=str(ids[id_rol]),
+                nombre=nombre,
+                descripcion=descripcion,
+                permisos=frozenset(PERMISOS[id_permiso] for id_permiso in permisos),
+            )
+        )
         for id_rol, nombre, descripcion, permisos in ROLES
     )
 
@@ -178,22 +183,25 @@ def cargar_roles(db: Database[dict[str, Any]], ids: dict[int, ObjectId]) -> None
 def cargar_usuarios(
     db: Database[dict[str, Any]], ids: dict[int, ObjectId], ids_roles: dict[int, ObjectId]
 ) -> None:
+    hasher = hasher_por_defecto()
     db[COLECCION_USUARIOS].insert_many(
-        {
-            "_id": ids[id_usuario],
-            "nombre": nombre,
-            "apellido": apellido,
-            "correo": correo,
-            "id_rol": ids_roles[id_rol],
-            "cargo": cargo,
-            "contrasena_hash": HASH_BCRYPT_FALSO,
-            "activo": activo,
-            "ultimo_acceso": momento_opcional(ultimo_acceso),
-            "intentos_fallidos": intentos,
-            "bloqueado_hasta": momento_opcional(bloqueado_hasta),
-            "debe_cambiar_contrasena": debe_cambiar,
-            "fecha_registro": momento(registro),
-        }
+        usuario_a_dict(
+            Usuario(
+                id=str(ids[id_usuario]),
+                nombre=nombre,
+                apellido=apellido,
+                correo=correo,
+                id_rol=str(ids_roles[id_rol]),
+                cargo=cargo,
+                contrasena_hash=hasher.hash(CONTRASENA_DEMO),
+                activo=activo,
+                ultimo_acceso=momento_opcional(ultimo_acceso),
+                intentos_fallidos=intentos,
+                bloqueado_hasta=momento_opcional(bloqueado_hasta),
+                debe_cambiar_contrasena=debe_cambiar,
+                fecha_registro=momento(registro),
+            )
+        )
         for (
             id_usuario,
             nombre,
@@ -209,6 +217,36 @@ def cargar_usuarios(
             registro,
         ) in USUARIOS
     )
+
+
+def imprimir_usuarios_demo() -> None:
+    roles = {id_rol: nombre for id_rol, nombre, _, _ in ROLES}
+    filas = [
+        (correo, roles[id_rol], nota_usuario(activo, intentos, bloqueado_hasta, debe_cambiar))
+        for _, _, _, correo, id_rol, _, activo, _, intentos, bloqueado_hasta, debe_cambiar, _ in (
+            USUARIOS
+        )
+    ]
+    ancho = max(len(correo) for correo, _, _ in filas)
+    print()
+    print(f"Usuarios de la demo (contraseña: {CONTRASENA_DEMO})")
+    print(f"  {'correo':<{ancho}} | {'rol':<13} | nota")
+    print(f"  {'-' * ancho}-+-{'-' * 13}-+-{'-' * 30}")
+    for correo, rol, nota in filas:
+        print(f"  {correo:<{ancho}} | {rol:<13} | {nota}")
+
+
+def nota_usuario(
+    activo: bool, intentos: int, bloqueado_hasta: str | None, debe_cambiar: bool
+) -> str:
+    if not activo:
+        return "inactivo: no puede entrar"
+    notas = []
+    if debe_cambiar:
+        notas.append("debe cambiar la contraseña")
+    if intentos:
+        notas.append(f"{intentos} intentos fallidos (bloqueo vencido: {bloqueado_hasta})")
+    return "; ".join(notas)
 
 
 def cargar_contratistas(db: Database[dict[str, Any]], ids: dict[int, ObjectId]) -> None:
@@ -352,6 +390,7 @@ def main() -> None:
     print(f"Base de datos: {db.name}")
     for coleccion in COLECCIONES:
         print(f"  {coleccion}: {db[coleccion].count_documents({})}")
+    imprimir_usuarios_demo()
 
 
 if __name__ == "__main__":

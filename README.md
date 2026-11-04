@@ -22,7 +22,7 @@ Requiere [uv](https://docs.astral.sh/uv/). Python 3.14 se instala solo.
 
 ```
 uv sync
-copy .env.example .env      # y completa MONGO_URI y MONGO_DB
+copy .env.example .env      # completa MONGO_URI, MONGO_DB y JWT_SECRET
 ```
 
 Si el DNS de tu red no resuelve URIs `mongodb+srv://`, usa la cadena larga `mongodb://` que Atlas
@@ -42,19 +42,28 @@ ofrece para versiones antiguas del driver.
 
 ## API
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/health` | Estado de la API y de la BD (200 o 503) |
-| POST | `/cuentas` | Radica una cuenta (201; 404 si el contrato no existe; 409 si está duplicada) |
-| GET | `/cuentas/{radicado}` | Consulta una cuenta con documentos e historial (404 si no existe) |
-| POST | `/cuentas/{radicado}/estado` | Cambia el estado (409 si la transición no es válida) |
-| GET | `/cuentas?estado=RECIBIDA` | Lista las cuentas en un estado |
+Todas las rutas de `/cuentas` exigen un token. En http://127.0.0.1:8000/docs pulsa
+*Authorize* e ingresa un correo del seed (por ejemplo `ana.rodriguez@entidad.gov.co`) con la
+contraseña `Demo2025*`. El seed imprime la lista de usuarios y sus roles.
+
+| Método | Ruta | Permiso | Descripción |
+|--------|------|---------|-------------|
+| GET | `/health` | — | Estado de la API y de la BD (200 o 503) |
+| POST | `/auth/login` | — | Formulario OAuth2 (`username` = correo, `password`); devuelve el token |
+| GET | `/auth/me` | token | Usuario, rol y permisos |
+| POST | `/auth/cambiar-contrasena` | token | Obligatorio si el usuario debe cambiarla; hasta entonces el resto responde 403 |
+| POST | `/cuentas` | `cuentas.radicar` | Radica una cuenta (201; 404 contrato inexistente; 409 duplicada) |
+| GET | `/cuentas/{radicado}` | `cuentas.consultar` | Cuenta con documentos e historial |
+| POST | `/cuentas/{radicado}/estado` | `cuentas.cambiar_estado` (+ `cuentas.pagar` para PAGADA) | Cambia el estado (409 si la transición no es válida) |
+| GET | `/cuentas?estado=RECIBIDA` | `cuentas.consultar` | Lista las cuentas en un estado |
+
+Códigos: 401 sin token o token inválido, 403 sin permiso, usuario inactivo o bloqueado (5 intentos
+fallidos bloquean 15 minutos). El usuario de cada operación se toma del token, no del cuerpo.
 
 Ejemplo de radicación, con el contrato `CONT-2025-001` del seed:
 
 ```json
 {
-  "id_usuario": "<_id de un usuario del seed>",
   "numero_radicado": "RAD-2026-0001",
   "numero_cuenta": "CUENTA-002",
   "numero_contrato": "CONT-2025-001",
