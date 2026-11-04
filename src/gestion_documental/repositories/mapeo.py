@@ -20,6 +20,7 @@ from gestion_documental.domain.enums import (
     TipoDocumento,
     TipoPersona,
 )
+from gestion_documental.domain.usuarios import Rol, Usuario
 from gestion_documental.domain.valores import ValorMonetario
 
 Registro = dict[str, Any]
@@ -204,4 +205,64 @@ def dict_a_contratista(datos: Registro) -> Contratista:
         creado_en=datos["creado_en"],
         modificado_por=id_opcional_desde_bson(datos["modificado_por"]),
         modificado_en=datos["modificado_en"],
+    )
+
+
+def rol_a_dict(rol: Rol) -> Registro:
+    datos: Registro = {
+        "nombre": rol.nombre,
+        "descripcion": rol.descripcion,
+        "activo": rol.activo,
+        "permisos": sorted(rol.permisos),
+    }
+    if rol.id is not None:
+        datos["_id"] = ObjectId(rol.id)
+    return datos
+
+
+def dict_a_rol(datos: Registro) -> Rol:
+    return Rol(
+        id=str(datos["_id"]),
+        nombre=datos["nombre"],
+        descripcion=datos["descripcion"],
+        activo=datos["activo"],
+        permisos=frozenset(datos["permisos"]),
+    )
+
+
+def usuario_a_dict(usuario: Usuario) -> Registro:
+    datos: Registro = {
+        "nombre": usuario.nombre,
+        "apellido": usuario.apellido,
+        "correo": usuario.correo,
+        "id_rol": ObjectId(usuario.id_rol),
+        "cargo": usuario.cargo,
+        "contrasena_hash": usuario.contrasena_hash,
+        "activo": usuario.activo,
+        "ultimo_acceso": usuario.ultimo_acceso,
+        "intentos_fallidos": usuario.intentos_fallidos,
+        "bloqueado_hasta": usuario.bloqueado_hasta,
+        "debe_cambiar_contrasena": usuario.debe_cambiar_contrasena,
+        "fecha_registro": usuario.fecha_registro,
+    }
+    if usuario.id is not None:
+        datos["_id"] = ObjectId(usuario.id)
+    return datos
+
+
+def dict_a_usuario(datos: Registro) -> Usuario:
+    return Usuario(
+        id=str(datos["_id"]),
+        nombre=datos["nombre"],
+        apellido=datos["apellido"],
+        correo=datos["correo"],
+        id_rol=str(datos["id_rol"]),
+        cargo=datos["cargo"],
+        contrasena_hash=datos["contrasena_hash"],
+        activo=datos["activo"],
+        ultimo_acceso=datos["ultimo_acceso"],
+        intentos_fallidos=datos["intentos_fallidos"],
+        bloqueado_hasta=datos["bloqueado_hasta"],
+        debe_cambiar_contrasena=datos["debe_cambiar_contrasena"],
+        fecha_registro=datos["fecha_registro"],
     )

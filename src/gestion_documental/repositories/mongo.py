@@ -7,21 +7,29 @@ from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.cuenta_cobro import CuentaCobro
 from gestion_documental.domain.enums import EstadoCuenta
 from gestion_documental.domain.tiempo import ahora_utc
+from gestion_documental.domain.usuarios import Rol, Usuario
 from gestion_documental.repositories.base import (
     RegistroDuplicadoError,
     RepositorioContratistas,
     RepositorioContratos,
     RepositorioCuentas,
+    RepositorioRoles,
+    RepositorioUsuarios,
 )
 from gestion_documental.repositories.mapeo import (
     COLECCION_CONTRATISTAS,
     COLECCION_CONTRATOS,
     COLECCION_CUENTAS,
+    COLECCION_ROLES,
+    COLECCION_USUARIOS,
     Registro,
     cuenta_a_dict,
     dict_a_contratista,
     dict_a_contrato,
     dict_a_cuenta,
+    dict_a_rol,
+    dict_a_usuario,
+    usuario_a_dict,
 )
 
 
@@ -74,3 +82,40 @@ class RepositorioContratistasMongo(RepositorioContratistas):
     def obtener_por_identificacion(self, nit_cedula: str) -> Contratista | None:
         datos = self._coleccion.find_one({"nit_cedula": nit_cedula})
         return None if datos is None else dict_a_contratista(datos)
+
+
+class RepositorioUsuariosMongo(RepositorioUsuarios):
+    def __init__(self, db: Database[Registro]) -> None:
+        self._coleccion = db[COLECCION_USUARIOS]
+
+    def obtener_por_id(self, id_usuario: str) -> Usuario | None:
+        if not ObjectId.is_valid(id_usuario):
+            return None
+        datos = self._coleccion.find_one({"_id": ObjectId(id_usuario)})
+        return None if datos is None else dict_a_usuario(datos)
+
+    def obtener_por_correo(self, correo: str) -> Usuario | None:
+        datos = self._coleccion.find_one({"correo": correo})
+        return None if datos is None else dict_a_usuario(datos)
+
+    def guardar(self, usuario: Usuario) -> None:
+        if usuario.id is None:
+            usuario.id = str(ObjectId())
+        datos = usuario_a_dict(usuario)
+        try:
+            self._coleccion.replace_one({"_id": datos["_id"]}, datos, upsert=True)
+        except DuplicateKeyError as exc:
+            raise RegistroDuplicadoError(
+                f"Ya existe un usuario con correo {usuario.correo}"
+            ) from exc
+
+
+class RepositorioRolesMongo(RepositorioRoles):
+    def __init__(self, db: Database[Registro]) -> None:
+        self._coleccion = db[COLECCION_ROLES]
+
+    def obtener_por_id(self, id_rol: str) -> Rol | None:
+        if not ObjectId.is_valid(id_rol):
+            return None
+        datos = self._coleccion.find_one({"_id": ObjectId(id_rol)})
+        return None if datos is None else dict_a_rol(datos)

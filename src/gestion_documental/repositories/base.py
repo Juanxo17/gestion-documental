@@ -4,6 +4,7 @@ from gestion_documental.domain.contratistas import Contratista
 from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.cuenta_cobro import CuentaCobro
 from gestion_documental.domain.enums import EstadoCuenta
+from gestion_documental.domain.usuarios import Rol, Usuario
 
 
 class RegistroDuplicadoError(Exception):
@@ -32,3 +33,19 @@ class RepositorioContratos(ABC):
 class RepositorioContratistas(ABC):
     @abstractmethod
     def obtener_por_identificacion(self, nit_cedula: str) -> Contratista | None: ...
+
+
+class RepositorioUsuarios(ABC):
+    @abstractmethod
+    def obtener_por_id(self, id_usuario: str) -> Usuario | None: ...
+
+    @abstractmethod
+    def obtener_por_correo(self, correo: str) -> Usuario | None: ...
+
+    @abstractmethod
+    def guardar(self, usuario: Usuario) -> None: ...
+
+
+class RepositorioRoles(ABC):
+    @abstractmethod
+    def obtener_por_id(self, id_rol: str) -> Rol | None: ...
