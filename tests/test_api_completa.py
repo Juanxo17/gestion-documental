@@ -36,6 +36,7 @@ ENDPOINTS: list[tuple[str, str, str | None]] = [
     ("GET", "/contratos", "contratos.consultar"),
     ("POST", "/contratos", "contratos.gestionar"),
     ("POST", "/contratos/CONT-SINT-001/estado", "contratos.gestionar"),
+    ("GET", "/contratos/supervisores", "contratos.gestionar"),
     ("POST", "/cuentas", "cuentas.radicar"),
     ("GET", "/cuentas", "cuentas.consultar"),
     ("GET", "/cuentas/RAD-X/historial", "cuentas.consultar"),
@@ -413,3 +414,9 @@ def test_dashboard_resumen(api: ClienteApi) -> None:
 
     assert resumen["por_estado"] == [{"clave": "RECIBIDA", "cantidad": 2, "total": "1500500.50"}]
     assert resumen["por_contrato"][0]["clave"] == "CONT-SINT-001"
+
+
+def test_supervisores_activos(api: ClienteApi) -> None:
+    respuesta = api.http.get("/contratos/supervisores", headers=api.cabeceras(SUPERVISOR))
+
+    assert [s["correo"] for s in respuesta.json()] == [SUPERVISOR]

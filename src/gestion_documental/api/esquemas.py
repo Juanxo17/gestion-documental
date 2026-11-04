@@ -167,6 +167,12 @@ class UsuarioRespuesta(BaseModel):
         )
 
 
+class SupervisorRespuesta(BaseModel):
+    id: str
+    nombre_completo: str
+    correo: str
+
+
 class UsuarioCreadoRespuesta(BaseModel):
     usuario: UsuarioRespuesta
     contrasena_temporal: str

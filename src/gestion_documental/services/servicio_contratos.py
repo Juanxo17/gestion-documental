@@ -4,6 +4,7 @@ from decimal import Decimal
 from gestion_documental.domain.contrato import Contrato
 from gestion_documental.domain.enums import EstadoContrato
 from gestion_documental.domain.errores import ErrorDominio, NoEncontradoError
+from gestion_documental.domain.usuarios import Usuario
 from gestion_documental.domain.valores import ValorMonetario
 from gestion_documental.events.eventos import ContratoCambiado
 from gestion_documental.events.publicador import EventPublisher
@@ -37,6 +38,12 @@ class ServicioContratos:
 
     def listar(self, estado: EstadoContrato | None = None) -> list[Contrato]:
         return self._contratos.listar(estado=estado)
+
+    def supervisores(self) -> list[Usuario]:
+        rol = self._roles.obtener_por_nombre(ROL_SUPERVISOR)
+        if rol is None:
+            return []
+        return [u for u in self._usuarios.listar() if u.id_rol == rol.id and u.activo]
 
     def obtener(self, numero_contrato: str) -> Contrato:
         contrato = self._contratos.obtener_por_numero(numero_contrato)

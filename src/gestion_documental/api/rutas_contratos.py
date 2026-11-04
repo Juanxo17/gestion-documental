@@ -8,6 +8,7 @@ from gestion_documental.api.esquemas import (
     SolicitudContrato,
     SolicitudEdicionContrato,
     SolicitudEstadoContrato,
+    SupervisorRespuesta,
 )
 from gestion_documental.api.seguridad import requiere_permiso
 from gestion_documental.domain.enums import EstadoContrato
@@ -24,6 +25,20 @@ def listar(
     sesion: PuedeConsultar, servicio: ServicioContratosDep, estado: EstadoContrato | None = None
 ) -> list[ContratoRespuesta]:
     return [ContratoRespuesta.desde_dominio(c) for c in servicio.listar(estado)]
+
+
+@router.get("/supervisores")
+def supervisores(
+    sesion: PuedeGestionar, servicio: ServicioContratosDep
+) -> list[SupervisorRespuesta]:
+    return [
+        SupervisorRespuesta(
+            id=usuario.id or "",
+            nombre_completo=f"{usuario.nombre} {usuario.apellido}",
+            correo=usuario.correo,
+        )
+        for usuario in servicio.supervisores()
+    ]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
