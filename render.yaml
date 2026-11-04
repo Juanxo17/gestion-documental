@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gestion-documental-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB
+        value: gestion_documental
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_MINUTOS
+        value: "60"
+      - key: CORS_ORIGINS
+        sync: false
