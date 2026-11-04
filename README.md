@@ -1,83 +1,144 @@
-# Gestión documental de cuentas de cobro
+# Gestión Documental
 
-Sistema en Python para radicar cuentas de cobro de contratistas, adjuntar sus documentos y
-seguir su recorrido por estados (RECIBIDA → EN_REVISION → APROBADA/RECHAZADA → PAGADA, o ANULADA).
-Usa POO (jerarquías de documentos, mixins, composición), una arquitectura basada en eventos y
-MongoDB Atlas. Proyecto integrador académico; todos los datos son sintéticos.
+[![CI](https://github.com/Juanxo17/gestion-documental/actions/workflows/ci.yml/badge.svg)](https://github.com/Juanxo17/gestion-documental/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB_Atlas-47A248?logo=mongodb&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=nextdotjs&logoColor=white)
+
+Plataforma para radicar, revisar, aprobar y pagar las **cuentas de cobro** de los contratistas de una entidad pública, con sus soportes documentales, control de acceso por roles y trazabilidad completa de cada acción.
+
+Es el proyecto integrador de un curso de programación orientada a objetos: el núcleo está construido para mostrar abstracción, jerarquías de herencia, composición, LSP, polimorfismo y una arquitectura basada en eventos sobre MongoDB. Todos los datos son sintéticos.
+
+**En vivo:** https://gestion-documental-livid.vercel.app
+
+## Probarlo
+
+Contraseña de todos los usuarios de ejemplo: `Demo2025*`
+
+| Usuario | Rol | Puede |
+|---|---|---|
+| `ana.rodriguez@entidad.gov.co` | Administrador | Todo, incluido pagar, gestionar usuarios y ver la auditoría |
+| `jorge.martinez@entidad.gov.co` | Supervisor | Gestionar contratos y cambiar el estado de las cuentas |
+| `maria.cifuentes@entidad.gov.co` | Revisor | Pasar cuentas a revisión, aprobarlas o rechazarlas |
+| `luz.paredes@entidad.gov.co` | Radicador | Radicar, editar y adjuntar documentos. Debe cambiar la contraseña al entrar |
+| `pedro.sarmiento@entidad.gov.co` | Consulta | Usuario inactivo en los datos de ejemplo: el sistema rechaza su acceso |
+
+El backend corre en el plan gratuito de Render: si estuvo inactivo, la primera petición puede tardar hasta un minuto y la interfaz lo avisa.
 
 ## Arquitectura
 
+![Arquitectura](docs/arquitectura.png)
+
+El navegador solo habla con las rutas `/api` de Next.js (patrón *Backend for Frontend*). Esas rutas guardan el JWT en una cookie `httpOnly`, `secure` y `sameSite=lax`, y reenvían cada petición al backend: el token nunca llega al JavaScript del navegador.
+
+En el backend, cada caso de uso sigue el mismo recorrido:
+
+```mermaid
+sequenceDiagram
+    participant API as api/ (FastAPI)
+    participant S as services/
+    participant D as domain/
+    participant R as repositories/
+    participant B as Bus de eventos
+    participant A as AuditoriaMongo
+    API->>S: comando inmutable (Pydantic)
+    S->>R: validaciones (contrato, duplicados, tope)
+    S->>D: regla de negocio (transición, edición)
+    S->>R: guardar
+    S->>B: publicar evento (solo si guardar tuvo éxito)
+    B->>A: entrega por MRO del evento
 ```
-api/  ──▶  services/  ──▶  domain/        reglas de negocio, sin dependencias externas
-              │   └──▶  repositories/      interfaz + Mongo + memoria
-              └──────▶  events/            comandos, eventos, bus y suscriptores
-```
 
-Código en `src/gestion_documental/`. Cada tema del temario está ubicado en
-`docs/matriz-trazabilidad.md`, con notas en `docs/explicaciones/`.
+| Capa | Responsabilidad |
+|---|---|
+| `domain/` | Reglas puras: jerarquía de documentos, cuentas, contratos, contratistas, usuarios. No conoce FastAPI ni PyMongo |
+| `events/` | Comandos y eventos inmutables, `EventPublisher`, `EventSubscriber`, auditoría y notificador |
+| `repositories/` | Una interfaz por agregado con implementación MongoDB (colecciones y GridFS) y en memoria |
+| `services/` | Orquestación de cada caso de uso |
+| `api/` | Rutas, autenticación JWT, permisos por rol y errores uniformes `{"error", "detalle"}` |
 
-## Instalación
+## Funcionalidades
 
-Requiere [uv](https://docs.astral.sh/uv/). Python 3.14 se instala solo.
+- Radicación con reglas de negocio: contrato `ACTIVO` y vigente, número de cuenta único por contrato y suma de cuentas que nunca supera el valor del contrato.
+- Flujo de estados `RECIBIDA → EN_REVISION → APROBADA/RECHAZADA → PAGADA`, con anulación y un historial que se muestra como línea de tiempo.
+- Adjuntos PDF, JPG o PNG de hasta 10 MB, validados por su contenido y no por la extensión, guardados en GridFS con su sha256. La descarga verifica el hash antes de enviar.
+- Roles y permisos según la matriz del diseño: bloqueo tras 5 intentos fallidos, usuarios inactivos y cambio obligatorio de contraseña.
+- Auditoría persistente de cada evento y un resumen con agregaciones `$group` de MongoDB.
+- Interfaz responsive y accesible que muestra solo las acciones permitidas al rol.
 
-```
+## Stack
+
+| Área | Tecnología |
+|---|---|
+| Backend | Python 3.14, FastAPI, Pydantic, PyMongo, PyJWT, pwdlib (bcrypt) |
+| Base de datos | MongoDB Atlas y GridFS |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript estricto, Tailwind CSS 4 |
+| Calidad | pytest, Playwright, ruff, mypy estricto, ESLint, pre-commit |
+| Infraestructura | Docker, Docker Compose, GitHub Actions, Render, Vercel |
+
+## Correr en local
+
+Requisitos: [uv](https://docs.astral.sh/uv/), Node 20 o superior y una base en MongoDB Atlas.
+
+```bash
+cp .env.example .env                 # MONGO_URI, MONGO_DB, JWT_SECRET, CORS_ORIGINS
 uv sync
-copy .env.example .env      # completa MONGO_URI, MONGO_DB, JWT_SECRET y CORS_ORIGINS
+uv run python scripts/seed.py        # carga los datos de ejemplo y los PDF en GridFS
+uv run fastapi dev                   # API en http://127.0.0.1:8000/docs
+
+cd frontend
+cp .env.example .env.local           # BACKEND_URL=http://127.0.0.1:8000
+npm install
+npm run dev                          # http://localhost:3000
 ```
 
-Si el DNS de tu red no resuelve URIs `mongodb+srv://`, usa la cadena larga `mongodb://` que Atlas
-ofrece para versiones antiguas del driver.
+Con Docker (MongoDB sigue en Atlas):
 
-## Uso
+```bash
+docker compose up --build            # frontend en :3000, backend en :8000
+```
 
-| Qué | Comando |
-|-----|---------|
-| Cargar datos de ejemplo en Atlas | `uv run python scripts/seed.py` |
-| Demo sin red (repositorios en memoria) | `uv run python demo.py` |
-| Demo contra Atlas | `uv run python demo.py --mongo` |
-| API en desarrollo | `uv run fastapi dev` → http://127.0.0.1:8000/docs |
-| Tests (sin red) | `uv run pytest` |
-| Tests contra Atlas | `uv run pytest -m integracion` |
-| Lint y tipos | `uv run ruff check .` y `uv run mypy .` |
+Sin base de datos ni red, `uv run python demo.py` recorre en consola los temas del curso con repositorios en memoria.
 
-## API
+## Pruebas
 
-Todas las rutas, salvo `/health` y `/auth/login`, exigen un token. En
-http://127.0.0.1:8000/docs pulsa *Authorize* e ingresa un correo del seed (por ejemplo
-`ana.rodriguez@entidad.gov.co`, Administrador) con la contraseña `Demo2025*`. El seed imprime la
-lista de usuarios y sus roles. Los endpoints están agrupados por módulo en `/docs`.
+```bash
+uv run pytest                        # más de 330 pruebas, sin red
+uv run pytest -m integracion         # la misma batería contra Atlas y GridFS
+uv run ruff check . && uv run mypy .
+cd frontend && npm run lint && npm run typecheck && npm run build
+npm run e2e                          # Playwright: login, radicar y aprobar
+```
 
-| Módulo | Rutas principales | Permisos |
-|--------|-------------------|----------|
-| auth | `POST /auth/login`, `GET /auth/me`, `POST /auth/cambiar-contrasena` | token |
-| usuarios | `GET/POST /usuarios`, `GET/PATCH /usuarios/{id}`, `PUT /usuarios/{id}/rol`, `POST /usuarios/{id}/desactivar`, `POST /usuarios/{id}/reiniciar-bloqueo` | `usuarios.gestionar` |
-| contratistas | `GET /contratistas?q=&solo_activos=`, `POST /contratistas`, `GET/PATCH /contratistas/{id}`, `POST /contratistas/{id}/desactivar` | `contratistas.consultar` / `gestionar` |
-| contratos | `GET /contratos?estado=`, `POST /contratos`, `GET/PATCH /contratos/{numero}`, `POST /contratos/{numero}/estado` | `contratos.consultar` / `gestionar` |
-| cuentas | `POST /cuentas`, `GET /cuentas?estado=&numero_contrato=&nit_contratista=&desde=&hasta=&pagina=&tamano=`, `GET/PATCH /cuentas/{radicado}`, `GET /cuentas/{radicado}/historial`, `POST /cuentas/{radicado}/estado`, `/anular`, `/pagar` | `cuentas.radicar`, `consultar`, `editar`, `cambiar_estado`, `pagar` |
-| documentos | `POST /cuentas/{radicado}/documentos` (multipart), `POST .../documentos/url`, `GET .../documentos/{id}/descarga`, `DELETE .../documentos/{id}` | `documentos.adjuntar`, `consultar`, `eliminar` |
-| auditoría | `GET /auditoria?tipo=&id_usuario=&desde=&hasta=&limite=` | solo Administrador |
-| dashboard | `GET /dashboard/resumen` | `cuentas.consultar` |
-| sistema | `GET /health` | — |
+Los repositorios de memoria y de MongoDB pasan la misma batería de pruebas (principio de sustitución de Liskov aplicado a la persistencia). La matriz rol por endpoint verifica los permisos de los 5 roles en 22 rutas.
 
-Todas las respuestas de error tienen la forma `{"error": "CODIGO", "detalle": "mensaje"}`:
-400 regla de negocio o archivo inválido, 401 sin token, 403 sin permiso, usuario inactivo o
-bloqueado, 404 no encontrado, 409 duplicado, transición inválida o archivo alterado, 413 archivo
-de más de 10 MB, 422 datos con formato inválido, 503 base de datos no disponible.
+## Despliegue
 
-Reglas principales: solo se radica contra contratos ACTIVO dentro de su vigencia; la suma de las
-cuentas no anuladas ni rechazadas no puede superar el valor del contrato; una cuenta se edita
-solo en RECIBIDA o EN_REVISION; los adjuntos aceptan PDF, JPG o PNG (validados por contenido) y
-se guardan en GridFS con su sha256, que se verifica en cada descarga.
+- **Backend:** Render, con el `Dockerfile` (etapas separadas con uv, usuario no root y healthcheck a `/health`) descrito en `render.yaml`.
+- **Frontend:** Vercel, con `frontend/` como raíz y la variable `BACKEND_URL`.
+- **CI:** GitHub Actions ejecuta ruff, mypy y pytest para el backend, y lint, typecheck y build para el frontend, en cada push y pull request.
 
-Ejemplo de radicación, con el contrato `CONT-2025-001` del seed:
+## Documentación
 
-```json
-{
-  "numero_radicado": "RAD-2026-0001",
-  "numero_cuenta": "CUENTA-002",
-  "numero_contrato": "CONT-2025-001",
-  "valor_cobro": "1500000.00",
-  "concepto_pago": "Acta parcial 2",
-  "fecha_presentacion": "2026-01-31"
-}
+- [Guía de uso](docs/guia-alexandra.pdf): recorrido con capturas, los 16 temas del curso en lenguaje simple y glosario.
+- [Guía técnica](docs/guia-tecnica.pdf): capas, flujo de eventos, decisiones, matriz de trazabilidad, riesgos y preguntas de sustentación.
+
+## Estructura
+
+```
+.
+├── src/gestion_documental/
+│   ├── domain/          reglas de negocio y jerarquías de clases
+│   ├── events/          comandos, eventos, publicador y suscriptores
+│   ├── repositories/    interfaces, MongoDB, GridFS y memoria
+│   ├── services/        casos de uso
+│   └── api/             rutas FastAPI, seguridad y errores
+├── frontend/            Next.js (pantallas, BFF y pruebas e2e)
+├── tests/               pruebas de dominio, servicios, API y repositorios
+├── scripts/seed.py      datos de ejemplo
+├── demo.py              demostración en consola
+├── docs/                guías en PDF y diagrama
+├── Dockerfile, docker-compose.yml, render.yaml
+└── .github/workflows/ci.yml
 ```
