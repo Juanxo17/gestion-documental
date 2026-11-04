@@ -47,3 +47,5 @@ disable_error_code = ["type-abstract"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not integracion'"
+markers = ["integracion: requiere MongoDB Atlas configurado en .env"]

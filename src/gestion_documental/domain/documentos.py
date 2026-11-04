@@ -2,12 +2,13 @@ import hashlib
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 from gestion_documental.domain.enums import OrigenDocumento, TipoDocumento
 from gestion_documental.domain.errores import ErrorDominio
+from gestion_documental.domain.tiempo import ahora_utc
 
 PATRON_SHA256 = re.compile(r"[0-9a-f]{64}")
 ESQUEMAS_URL = frozenset({"http", "https"})
@@ -22,7 +23,7 @@ class Documento(ABC):
     ruta_archivo: str
     tipo: TipoDocumento
     id_usuario: str
-    fecha_carga: datetime = field(default_factory=lambda: datetime.now(UTC))
+    fecha_carga: datetime = field(default_factory=ahora_utc)
 
     def __post_init__(self) -> None:
         self.validar()

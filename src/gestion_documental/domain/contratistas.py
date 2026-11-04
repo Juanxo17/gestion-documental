@@ -30,6 +30,7 @@ class Contratista(AuditableMixin, ABC):
     correo: str | None = None
     direccion: str | None = None
     activo: bool = True
+    id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.nombre_completo.strip():

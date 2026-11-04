@@ -1,11 +1,12 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Final
 
 from gestion_documental.domain.documentos import Documento
 from gestion_documental.domain.enums import EstadoCuenta
 from gestion_documental.domain.errores import ErrorDominio, TransicionInvalidaError
+from gestion_documental.domain.tiempo import ahora_utc
 from gestion_documental.domain.valores import ValorMonetario
 
 TRANSICIONES: Final[dict[EstadoCuenta, frozenset[EstadoCuenta]]] = {
@@ -26,7 +27,7 @@ class CambioEstado:
     estado_nuevo: EstadoCuenta
     id_usuario: str
     observacion: str | None = None
-    fecha_cambio: datetime = field(default_factory=lambda: datetime.now(UTC))
+    fecha_cambio: datetime = field(default_factory=ahora_utc)
 
 
 class CuentaCobro:

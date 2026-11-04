@@ -16,6 +16,7 @@ class Contrato:
     fecha_fin: date
     id_supervisor: str
     estado: EstadoContrato = EstadoContrato.ACTIVO
+    id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.numero_contrato.strip():

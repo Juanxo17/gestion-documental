@@ -10,7 +10,7 @@ from gestion_documental.config import get_settings
 
 @lru_cache
 def get_client() -> MongoClient[dict[str, Any]]:
-    return MongoClient(get_settings().mongo_uri, serverSelectionTimeoutMS=5000)
+    return MongoClient(get_settings().mongo_uri, serverSelectionTimeoutMS=5000, tz_aware=True)
 
 
 def get_db() -> Database[dict[str, Any]]:
