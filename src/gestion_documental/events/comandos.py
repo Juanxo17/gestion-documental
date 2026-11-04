@@ -15,7 +15,7 @@ class Comando(BaseModel):
 class RadicarCuenta(Comando):
     numero_radicado: str = Field(min_length=1, max_length=30)
     numero_cuenta: str = Field(min_length=1, max_length=30)
-    id_contrato: str = Field(min_length=1)
+    numero_contrato: str = Field(min_length=1, max_length=50)
     valor_cobro: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     concepto_pago: str = Field(min_length=1)
     fecha_presentacion: date

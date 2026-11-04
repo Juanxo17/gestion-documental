@@ -52,17 +52,27 @@ será pieza de portafolio.
 ## Comandos
 - Instalar dependencias: `uv sync`
 - Agregar dependencia: `uv add <paquete>` (de desarrollo: `uv add --dev <paquete>`)
-- Tests: `uv run pytest`
+- Tests sin red: `uv run pytest` (por defecto excluye el marcador `integracion`)
+- Tests contra Atlas: `uv run pytest -m integracion` (usan la BD `<MONGO_DB>_pruebas` y la borran)
+- Un solo test: `uv run pytest tests/test_servicio.py::test_transicion_invalida_no_guarda_ni_publica`
 - Lint y formato: `uv run ruff check .` y `uv run ruff format .`
 - Tipos: `uv run mypy .`
 - API en desarrollo: `uv run fastapi dev` (entrypoint fijado en `[tool.fastapi]` de pyproject.toml)
-- Un solo test: `uv run pytest tests/test_health.py::test_health_ok_cuando_la_bd_responde`
+- Seed (borra y recarga las 5 colecciones): `uv run python scripts/seed.py`
+- Demo: `uv run python demo.py` (memoria, sin red) o `--mongo` (Atlas, requiere seed)
 
 ## Arquitectura
-Layout src/: el paquete es `src/gestion_documental/`; config en `config.py`,
-conexión Mongo en `repositories/conexion.py`, app FastAPI en `api/main.py`.
-La BD se inyecta con `Depends(get_db)`; los tests la reemplazan con
-`app.dependency_overrides` y no usan red.
+Layout src/: el paquete es `src/gestion_documental/`. Flujo: `api/rutas_cuentas.py` recibe un
+comando Pydantic → `services/servicio_cuentas.py` valida con repositorios → dominio → `guardar`
+→ publica el evento en el `EventPublisher` (solo si guardar tuvo éxito).
+- El servicio llega a las rutas por `Depends(get_servicio)` (`api/dependencias.py`); los tests
+  lo reemplazan con `app.dependency_overrides` y repositorios en memoria (`tests/fabricas.py`).
+- Errores → HTTP en `api/main.py`: `ErrorDominio` 400, `NoEncontradoError` 404,
+  `RegistroDuplicadoError`/`TransicionInvalidaError` 409, Mongo caído 503.
+- Mapeo dominio ↔ BSON solo en `repositories/mapeo.py` (ids como ObjectId, dinero Decimal128,
+  fechas sin hora como datetime UTC). El dominio genera fechas con `domain/tiempo.ahora_utc()`
+  (milisegundos) para que la ida y vuelta con Mongo sea exacta.
+- mypy desactiva `type-abstract` porque el bus se suscribe a clases abstractas (`EventoDominio`).
 - domain/: Documento y subclases, mixins, value objects
 - events/: eventos y comandos (inmutables), EventPublisher, EventSubscriber
 - repositories/: interfaces abstractas + implementación Mongo + una en memoria
