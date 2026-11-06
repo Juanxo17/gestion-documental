@@ -80,13 +80,20 @@ export default function Contratistas() {
                   <td className="px-4 py-3">{contratista.activo ? "Activo" : "Inactivo"}</td>
                   {gestiona && (
                     <td className="px-4 py-3">
-                      {contratista.activo && (
+                      {contratista.activo ? (
                         <Boton
                           variante="secundario"
                           className="px-2 py-1 text-xs"
                           onClick={() => ejecutar(() => enviar(`/contratistas/${contratista.id}/desactivar`, "POST"), "Contratista desactivado.")}
                         >
                           Desactivar
+                        </Boton>
+                      ) : (
+                        <Boton
+                          className="px-2 py-1 text-xs"
+                          onClick={() => ejecutar(() => enviar(`/contratistas/${contratista.id}/activar`, "POST"), "Contratista activado.")}
+                        >
+                          Activar
                         </Boton>
                       )}
                     </td>

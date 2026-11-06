@@ -62,3 +62,10 @@ def desactivar(
     return ContratistaRespuesta.desde_dominio(
         servicio.desactivar(id_contratista, sesion.id_usuario)
     )
+
+
+@router.post("/{id_contratista}/activar")
+def activar(
+    id_contratista: str, sesion: PuedeGestionar, servicio: ServicioContratistasDep
+) -> ContratistaRespuesta:
+    return ContratistaRespuesta.desde_dominio(servicio.activar(id_contratista, sesion.id_usuario))

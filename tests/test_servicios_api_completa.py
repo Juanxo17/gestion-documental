@@ -435,6 +435,8 @@ def test_contratistas_crear_buscar_y_desactivar() -> None:
     ]
     desactivado = servicio.obtener(nuevo.id)
     assert (desactivado.activo, desactivado.modificado_por) == (False, "u2")
+    reactivado = servicio.activar(nuevo.id, "u3")
+    assert (reactivado.activo, reactivado.modificado_por) == (True, "u3")
     with pytest.raises(RegistroDuplicadoError):
         servicio.crear(
             tipo_persona=TipoPersona.NATURAL,

@@ -44,6 +44,10 @@ class Contratista(AuditableMixin, ABC):
         self.activo = False
         self.registrar_modificacion(id_usuario)
 
+    def activar(self, id_usuario: str) -> None:
+        self.activo = True
+        self.registrar_modificacion(id_usuario)
+
     @abstractmethod
     def validar_identificacion(self) -> None: ...
 

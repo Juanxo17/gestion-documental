@@ -65,9 +65,18 @@ class ServicioContratistas:
         return contratista
 
     def desactivar(self, id_contratista: str, id_usuario: str) -> Contratista:
+        return self._cambiar_activo(id_contratista, id_usuario, activo=False)
+
+    def activar(self, id_contratista: str, id_usuario: str) -> Contratista:
+        return self._cambiar_activo(id_contratista, id_usuario, activo=True)
+
+    def _cambiar_activo(self, id_contratista: str, id_usuario: str, *, activo: bool) -> Contratista:
         contratista = self.obtener(id_contratista)
         if contratista.creado_por is None:
             contratista.registrar_creacion(id_usuario)
-        contratista.desactivar(id_usuario)
+        if activo:
+            contratista.activar(id_usuario)
+        else:
+            contratista.desactivar(id_usuario)
         self._contratistas.guardar(contratista)
         return contratista

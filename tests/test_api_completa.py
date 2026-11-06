@@ -33,6 +33,7 @@ ENDPOINTS: list[tuple[str, str, str | None]] = [
     ("GET", "/contratistas", "contratistas.consultar"),
     ("POST", "/contratistas", "contratistas.gestionar"),
     ("POST", "/contratistas/x/desactivar", "contratistas.gestionar"),
+    ("POST", "/contratistas/x/activar", "contratistas.gestionar"),
     ("GET", "/contratos", "contratos.consultar"),
     ("POST", "/contratos", "contratos.gestionar"),
     ("POST", "/contratos/CONT-SINT-001/estado", "contratos.gestionar"),
@@ -185,6 +186,7 @@ def test_contratistas_crud_y_busqueda(api: ClienteApi) -> None:
     desactivado = api.http.post(f"/contratistas/{id_contratista}/desactivar", headers=cabeceras)
     busqueda = api.http.get("/contratistas", params={"q": "ana"}, headers=cabeceras)
     activos = api.http.get("/contratistas", params={"solo_activos": True}, headers=cabeceras)
+    reactivado = api.http.post(f"/contratistas/{id_contratista}/activar", headers=cabeceras)
     duplicado = api.http.post(
         "/contratistas",
         json={"tipo_persona": "NATURAL", "nombre_completo": "Otra", "nit_cedula": "52000001"},
@@ -202,6 +204,7 @@ def test_contratistas_crud_y_busqueda(api: ClienteApi) -> None:
     assert desactivado.json()["activo"] is False
     assert [c["nombre_completo"] for c in busqueda.json()] == ["Ana Sintética"]
     assert [c["nit_cedula"] for c in activos.json()] == ["900000001-2"]
+    assert reactivado.json()["activo"] is True
     assert duplicado.status_code == 409
     assert nit_invalido.json()["error"] == "ERROR_DE_NEGOCIO"
 

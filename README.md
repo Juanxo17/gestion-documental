@@ -111,7 +111,7 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 npm run e2e                          # Playwright: login, radicar y aprobar
 ```
 
-Los repositorios de memoria y de MongoDB pasan la misma batería de pruebas (principio de sustitución de Liskov aplicado a la persistencia). La matriz rol por endpoint verifica los permisos de los 5 roles en 22 rutas.
+Los repositorios de memoria y de MongoDB pasan la misma batería de pruebas (principio de sustitución de Liskov aplicado a la persistencia). La matriz rol por endpoint verifica los permisos de los 5 roles en 23 rutas.
 
 ## Despliegue
 
